@@ -22,6 +22,9 @@ const sizeSchema = new mongoose.Schema({
 })
 
 const productSchema = new mongoose.Schema({
+
+// TODO: bind every image with a color
+
     product_name: {
         type: String,
         required: true,
@@ -32,6 +35,10 @@ const productSchema = new mongoose.Schema({
         type: Number,
         required: true,
         index: true
+    },
+    stocks: {
+        type: Number,
+        required: true
     },
     discount: {
         type: Number,

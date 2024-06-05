@@ -46,7 +46,7 @@ const verifyAdminOrSeller = (req, res, next) => {
 }
 
 const verifyCustomer = (req, res, next) => {
-    req.cookies.userToken = req.cookies.customerToken
+    req.cookies.userToken = req.cookies.customerToken || req.cookies.adminToken || req.cookies.sellerToken
     verifyUser(req, res, next)
 }
 

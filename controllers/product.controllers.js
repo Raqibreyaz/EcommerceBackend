@@ -4,6 +4,8 @@ import imageModel from '../models/image.models.js'
 import { ApiError } from '../utils/ApiError.js'
 import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js'
 import categoryModel from '../models/category.models.js'
+import { cartModel } from '../models/CartAndOrder.models.js'
+import mongoose from 'mongoose'
 
 // images  [Object: null prototype] {
 //     thumbnail: [
@@ -45,6 +47,8 @@ import categoryModel from '../models/category.models.js'
 // this function just adds a new product 
 const addNewProduct = catchAsyncError(async (req, res, next) => {
 
+    // TODO: every image will have an associated color to bind with it
+
     // taking all the provided text data
     let {
         product_name,
@@ -56,7 +60,8 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         colors,
         sizes,
         details,
-        relatedProducts
+        stocks,
+        related_products = []
     } = req.body;
 
     sizes = JSON.parse(sizes)
@@ -81,6 +86,8 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         colors,
         sizes,
         details,
+        stocks,
+        related_products
     })
 
     let thumbnail = ''
@@ -126,21 +133,6 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
 }
 )
 
-// add a new catgeory 
-const addNewCategory = catchAsyncError(async (req, res, next) => {
-
-    const { name } = req.body
-
-    const category = await categoryModel.create({ name })
-
-    res.status(200).json({
-        success: true,
-        message: 'category created successfully',
-        category
-    })
-}
-)
-
 // this function is responsible for pagination,sorting,filtering 
 const fetchProducts = catchAsyncError(async (req, res, next) => {
 
@@ -148,7 +140,7 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 
     // const products = await productModel.find({}).limit(limit).skip((page - 1) * limit)
 
-    const { page = 1, limit = 10, category, minDiscount, owner, minPrice, maxPrice, rating, sortBy, order = 'asc' } = req.query;
+    const { page = 1, limit = 10, category, min_discount, owner, min_price, max_price, rating, sort_by, order = 'asc' } = req.query;
 
     const pipeline = [];
 
@@ -161,17 +153,17 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     }
 
     // if price is given for filtering then filter by price
-    if (minPrice && maxPrice) {
-        matchStage.price = { $gte: parseInt(minPrice), $lte: parseInt(maxPrice) };
+    if (min_price && max_price) {
+        matchStage.price = { $gte: parseInt(min_price), $lte: parseInt(max_price) };
     }
 
-    if (minDiscount) {
-        matchStage.discount = { $gte: parseInt(minDiscount) }
+    if (min_discount) {
+        matchStage.discount = { $gte: parseInt(min_discount) }
     }
 
     // owner must be the id
     if (owner) {
-        matchStage.owner = owner
+        matchStage.owner = new mongoose.Types.ObjectId(owner)
     }
 
     // if rating is given for filtering then filter by rating
@@ -180,40 +172,84 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     }
 
     // so filter all the documents that matches the given criteria
-    pipeline.push({ $match: matchStage });
-
-    // Sort stage
-    if (sortBy && order) {
-        // when order is not given that descending
-        pipeline.push({ $sort: { [sortBy]: order === 'asc' ? 1 : -1 } });
-    }
+    // pipeline.push({ $match: matchStage });
 
     // Facet stage for pagination and filtered total count
     pipeline.push({
         // facet runs the two pipelines parellely data and filteredTotal
         $facet: {
             data: [
+                { $match: matchStage },
                 { $skip: (parseInt(page) - 1) * parseInt(limit) },
-                { $limit: parseInt(limit) }
+                { $limit: parseInt(limit) },
+                {
+                    $lookup: {
+                        from: 'images',
+                        localField: 'thumbnail',
+                        foreignField: '_id',
+                        as: 'thumbnail'
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'owner',
+                        foreignField: '_id',
+                        as: 'owner'
+                    }
+                },
+                {
+                    $unwind: '$thumbnail'
+                },
+                {
+                    $unwind: '$owner'
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        product_name: 1,
+                        price: 1,
+                        discount: 1,
+                        'thumbnail.url': 1,
+                        'owner.fullname': 1,
+                        rating: 1,
+                        stocks: 1,
+                        category: 1
+                    }
+                }
             ],
             filteredTotal: [
+                { $match: matchStage },
                 // the result on counting the documents will be an object having key count and value is the result 
+                { $count: 'count' }
+            ],
+            total: [
                 { $count: 'count' }
             ]
         }
     });
 
+    // Sort stage
+    if (sort_by && order) {
+        // when order is not given that descending
+        pipeline.push({ $sort: { [sort_by]: order === 'asc' ? 1 : -1 } });
+    }
+
+
     // Execute the aggregation pipeline
     const result = await productModel.aggregate(pipeline).exec();
+
+    console.log(result);
 
     // get all the products
     const products = result[0].data;
     const filteredTotal = result[0].filteredTotal.length ? result[0].filteredTotal[0].count : 0;
+    const overallTotal = result[0].total.length ? result[0].total[0].count : 0;
 
     // Get approximate total count using $collStats
-    const stats = await productModel.collection.stats();
+    // const overallTotal = await productModel.countDocuments()
 
-    const overallTotal = stats.count;
+    console.log('total products ', overallTotal);
 
     res.json({
         products,
@@ -224,6 +260,12 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
         totalPages: Math.ceil(filteredTotal / limit)
     });
 })
+
+const fetchProductDetails = catchAsyncError(async (req, res, next) => {
+    const { id } = req.params
+    
+}
+)
 
 const editProduct = catchAsyncError(async (req, res, next) => {
 
@@ -330,16 +372,10 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
 
 )
 
-const addToCart = catchAsyncError(async () => {
-  
-}
-)
-
 export {
     addNewProduct,
     fetchProducts,
     editProduct,
     deleteProduct,
-    addNewCategory,
-    addToCart
+    fetchProductDetails
 }

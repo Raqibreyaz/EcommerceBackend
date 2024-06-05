@@ -3,6 +3,7 @@ import { catchAsyncError } from '../utils/catchAsyncError.js'
 import userModel from '../models/user.models.js'
 import { cartModel } from '../models/CartAndOrder.models.js'
 import { assignJwtToken } from '../utils/assignJwtToken.js'
+import productModel from '../models/product.models.js'
 
 const registerUser = catchAsyncError(async (req, res, next) => {
 
@@ -11,7 +12,7 @@ const registerUser = catchAsyncError(async (req, res, next) => {
     if (await userModel.findOne({ email }))
         throw new ApiError(400, "user already exists")
 
-// create the user 
+    // create the user 
     const user = await userModel.create({
         fullname,
         email,
@@ -73,10 +74,9 @@ const loginUser = catchAsyncError(async (req, res, next) => {
 )
 
 
-
 export {
     registerUser,
     registerAdmin,
     registerCustomer,
-    loginUser
+    loginUser,
 }

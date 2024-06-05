@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 
 const imageSchema = new mongoose.Schema({
+
+// TODO: image will be binded with a color
+
     productId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'product',

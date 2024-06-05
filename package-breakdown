@@ -6,3 +6,4 @@ mongoose
 bcrypt
 jsonwebtoken
 cookie-parser
+cors

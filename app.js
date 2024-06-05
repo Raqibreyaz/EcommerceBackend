@@ -1,6 +1,7 @@
 import express from 'express'
-import { connectToDatabase } from './db/db-connection.js'
 import { config } from "dotenv";
+import cors from 'cors'
+import { connectToDatabase } from './db/db-connection.js'
 import { errorMiddleWare } from './utils/ApiError.js'
 import cookieParser from 'cookie-parser';
 import userRouter from './routes/user.routes.js'; 
@@ -10,6 +11,10 @@ config({ path: "./.env" })
 
 const app = express()
 connectToDatabase()
+
+app.use(cors({
+    origin:[process.env.FRONTEND_URL,process.env.DASHBOARD_URL],
+}))
 
 app.use(cookieParser())
 app.use(express.json())
