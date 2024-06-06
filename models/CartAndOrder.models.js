@@ -16,9 +16,19 @@ const cartSchema = new mongoose.Schema({
             quantity: {
                 type: Number,
                 default: 0
+            },
+            size: {
+                type: String,
+                default: 'free size'
+            },
+            color: {
+                type: String,
             }
+        //     image: {
+        //         type: String  //url of the image
+        //     }
         }
-    ],
+    ]
 })
 
 const orderSchema = new mongoose.Schema({
@@ -47,7 +57,8 @@ const orderSchema = new mongoose.Schema({
     },
     deliveryStatus: {
         type: String,
-        enum: ['delivered', 'pending', 'cancelled']
+        enum: ['delivered', 'pending', 'cancelled', 'returned'],
+        default: 'pending'
     }
 }, { timestamps: true });
 

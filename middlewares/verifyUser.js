@@ -63,12 +63,12 @@ const verifyAdminOrOwner = async (req, res, next) => {
         user = validateToken(req.cookies.sellerToken)
 
         if (!user.id)
-            throw new ApiError(400, "user is not authenticated for this action")
+            return next(new ApiError(400, "user is not authenticated for this action"))
 
         let ownerId = mongoose.Types.ObjectId(user.id)
 
         if (product.owner !== ownerId)
-            throw new ApiError(400, "user not authorized for this action")
+            return next(new ApiError(400, "user not authorized for this action"))
 
         req.product = product;
     }

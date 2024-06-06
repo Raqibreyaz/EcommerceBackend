@@ -3,11 +3,13 @@ import { loginUser, registerAdmin, registerCustomer, registerUser } from '../con
 import { verifyAdmin, verifyCustomer } from '../middlewares/verifyUser.js'
 import orderRouter from '../routes/orders.routes.js'
 import wishlistRouter from '../routes/wishlist.routes.js'
+import cartRouter from '../routes/cart.routes.js'
 
 const router = express.Router()
 
-router.use('/wishlist',wishlistRouter)
-router.use('/orders',orderRouter)
+router.use('/wishlist', wishlistRouter)
+router.use('/orders', orderRouter)
+router.use('/cart', cartRouter)
 
 router.route('/register/customer')
     .post(registerCustomer)

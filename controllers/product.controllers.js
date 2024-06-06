@@ -6,6 +6,7 @@ import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js
 import categoryModel from '../models/category.models.js'
 import { cartModel } from '../models/CartAndOrder.models.js'
 import mongoose from 'mongoose'
+import { application } from 'express'
 
 // images  [Object: null prototype] {
 //     thumbnail: [
@@ -237,7 +238,7 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 
 
     // Execute the aggregation pipeline
-    const result = await productModel.aggregate(pipeline).exec();
+    const result = await productModel.aggregate(pipeline)
 
     console.log(result);
 
@@ -262,11 +263,75 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 })
 
 const fetchProductDetails = catchAsyncError(async (req, res, next) => {
+
+    // TODO: consider related products
+
     const { id } = req.params
-    
+    // product is an array
+    const product = await productModel.aggregate([
+        {
+            $match: { _id: mongoose.Types.ObjectId.createFromHexString(id) }
+        },
+        {
+            $lookup: {
+                from: 'images',
+                localField: 'thumbnail',
+                foreignField: '_id',
+                as: 'thumbnail'
+            }
+        },
+        {
+            $lookup: {
+                from: 'images',
+                localField: 'images',
+                foreignField: '_id',
+                as: 'images'
+            }
+        },
+        {
+            $lookup: {
+                from: 'users',
+                localField: 'owner',
+                foreignField: '_id',
+                as: 'owner'
+            }
+        },
+        {
+            $unwind: '$thumbnail'
+        },
+        {
+            $unwind: '$owner'
+        },
+        {
+            $project: {
+                _id: 1,
+                product_name: 1,
+                price: 1,
+                discount: 1,
+                'thumbnail.url': 1,
+                'owner.fullname': 1,
+                'images.url': 1,
+                rating: 1,
+                stocks: 1,
+                category: 1,
+                details: 1,
+                keyHighlights: 1,
+                colors: 1,
+                sizes: 1,
+                related_products: 1,
+                review: 1
+            }
+        }
+    ])
+
+    res.status(200).json({
+        success: true,
+        product: product[0]
+    })
 }
 )
 
+// TODO: reconsider the logic of this function
 const editProduct = catchAsyncError(async (req, res, next) => {
 
     // updating stocks
@@ -285,10 +350,11 @@ const editProduct = catchAsyncError(async (req, res, next) => {
         sizes,
         details,
         keyHighlights,
+        stocks,
         //imageIds of every image associated to the product to be deleted
-        imageIds,
+        imageIds = [],
         // ids of products []
-        relatedProducts
+        relatedProducts = []
     } = req.body
 
     // thumbnail have the imageId of the thumbnail
@@ -324,15 +390,29 @@ const editProduct = catchAsyncError(async (req, res, next) => {
         }
     }
 
-    sizes = JSON.parse(sizes)
-    colors = JSON.parse(colors)
+    if (sizes)
+        sizes = JSON.parse(sizes)
+    if (colors)
+        colors = JSON.parse(colors)
 
-    for (const imageId of imageIds) {
+    for (let i = 0; i < imageIds.length; i++) {
+        const imageId = imageIds[i]
         let public_id = await imageModel.findOneAndDelete({ _id: imageId }).public_id
         await deleteFromCloudinary(public_id)
     }
 
-    const product = await productModel.findOneAndUpdate({
+    // TODO: adding related products to the product
+    // if (relatedProducts.length){
+
+    // }
+
+    // TODO: removing the deleted image references from the document
+    // for (const imageId of imageIds) {
+    //     const id = mongoose.Types.ObjectId.createFromHexString(imageId)
+
+    // }
+
+    const newProduct = {
         product_name,
         price,
         discount,
@@ -342,8 +422,19 @@ const editProduct = catchAsyncError(async (req, res, next) => {
         sizes,
         details,
         keyHighlights,
-        thumbnail,
-        images: newImages
+    }
+
+    if (thumbnail)
+        updatedProduct.thumbnail = thumbnail
+    if (newImages.length)
+        updatedProduct.images = newImages
+
+    const updatedProduct = await productModel.findByIdAndUpdate(productId, newProduct, { new: true })
+
+    res.status(200).json({
+        success: true,
+        message: 'product updated successfully',
+        product: updatedProduct
     })
 }
 )
@@ -352,9 +443,15 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
 
     let productId = req.params.id
 
+    if (!productId)
+        throw new ApiError(400, "provide an id to delete")
+
     // fetch and delete all images associated with the product
     let imageDocs = await imageModel.find({ productId })
-    console.log(imageDocs);
+
+    if (!imageDocs.length)
+        throw new ApiError(400, "provide a valid email id")
+
     for (const imageDoc of imageDocs) {
         await deleteFromCloudinary(imageDoc.public_id)
         await imageModel.findByIdAndDelete(imageDoc._id)
@@ -368,8 +465,6 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
         message: 'product deleted successfully'
     })
 }
-
-
 )
 
 export {
