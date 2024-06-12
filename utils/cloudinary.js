@@ -12,6 +12,11 @@ export const uploadOnCloudinary = async (filepath) => {
         });
         return uploadResponse
     } catch (error) {
+        fs.unlink(filepath, (err) => {
+            if (err) {
+                console.error(`Error deleting the local file: ${filepath}`, err);
+            }
+        });
         error.message = `cloudinary upload error, ${error.message}`
         throw error
     }

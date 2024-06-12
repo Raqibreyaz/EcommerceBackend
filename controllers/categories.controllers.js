@@ -1,5 +1,6 @@
-import { catchAsyncError } from "../utils/catchAsyncError"
-import categoryModel from "../models/category.models"
+import { catchAsyncError } from "../utils/catchAsyncError.js"
+import categoryModel from "../models/category.models.js"
+
 // add a new catgeory 
 const addNewCategory = catchAsyncError(async (req, res, next) => {
 
@@ -26,7 +27,18 @@ const fetchCategories = catchAsyncError(async (req, res, next) => {
 }
 )
 
+const editCategory = catchAsyncError(async (req,res,next) => {
+  
+}
+)
+
+const deleteCategory = catchAsyncError(async (req,res,next) => {
+  
+}
+)
 export {
     addNewCategory,
-    fetchCategories
+    fetchCategories,
+    editCategory,
+    deleteCategory
 }

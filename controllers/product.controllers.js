@@ -48,88 +48,147 @@ import { application } from 'express'
 // this function just adds a new product 
 const addNewProduct = catchAsyncError(async (req, res, next) => {
 
-    // TODO: every image will have an associated color to bind with it
+
+    // consider adding info of the owner like id
 
     // taking all the provided text data
     let {
         product_name,
         price,
+        isReturnable = true, //can be a string
+        returnPolicy,
+        totalStocks,
         discount,
         description,
         category,
-        keyHighlights,
-        colors,
-        sizes,
+        keyHighlights, //array of  highlight
+        colors, //just an array of colors
+        sizes, //array of sizes
         details,
         stocks,
-        related_products = []
     } = req.body;
 
-    sizes = JSON.parse(sizes)
-    colors = JSON.parse(colors)
+    console.log('parsing data to object fron json');
 
+    keyHighlights = JSON.parse(keyHighlights)
+    sizes = JSON.parse(sizes)
+    stocks = JSON.parse(stocks)
+    colors = JSON.parse(colors)
+    isReturnable = Boolean(isReturnable)
+    // [{color:'',images:[{image:imagePath,is_main}]}]
+    colors = colors.map((color, index) => {
+        // is an array containing images path and is_main for that color
+        let images = req.files.filter((file) => file.fieldname.includes(`colors[${index}]`))
+            .map((file) => {
+                if (file.fieldname.includes('mainImage')) {
+                    return {
+                        image: file.path,
+                        is_main: true
+                    }
+                }
+                return {
+                    image: file.path,
+                    is_main: false
+                }
+            })
+
+        console.log(images);
+
+        return {
+            color,
+            images
+        }
+    })
+    keyHighlights = keyHighlights.map(({ highlight }) => highlight)
+    sizes = sizes.map(({ size }) => size)
+
+    console.log('going to get thumbnail');
+
+    console.log(req.files);
+
+    let thumbnail = ''
+
+    for (const image of req.files) {
+        if (image.fieldname === 'thumbnail') {
+            thumbnail = image
+            break;
+        }
+    }
+
+    console.log(thumbnail);
+
+    const thumbnailRes = await uploadOnCloudinary(thumbnail.path)
+
+    const newThumbnail = await imageModel.create({
+        docId: product._id,
+        url: thumbnailRes.url,
+        public_id: thumbnailRes.public_id
+    })
+
+    console.log('finding category');
     // take the given category first
     let productCategory = await categoryModel.findOne({ name: category.toLowerCase() })
-
     if (!productCategory) {
         throw new ApiError(404, "category does not exist")
     }
 
+    console.log('creating product');
     // creating the product 
     const product = await productModel.create({
         product_name,
         price,
+        isReturnable, //can be a string
+        returnPolicy,
+        totalStocks,
+        thumbnail: newThumbnail._id,
         discount,
         description,
-        category: productCategory.name,
+        category,
         keyHighlights,
-        owner: req.user.id,
-        colors,
         sizes,
         details,
         stocks,
-        related_products
     })
 
-    let thumbnail = ''
-    let images = []
+    console.log('taking images uploading to cloudinary');
+    let newColors = []
+    // take the color and its images
+    for (const { color, images } of colors) {
+        let newImages = []
+        // take the image and is_main boolean
+        for (const { image, is_main } of images) {
+            // take the image ,upload on cloudinary , create a new imagedoc and append it in newImages
+            let cloudinaryResponse = await uploadOnCloudinary(image)
+            let newImage = await imageModel.create({
+                docId: product._id,
+                url: cloudinaryResponse.url,
+                public_id: cloudinaryResponse.public_id
+            })
 
-    if (!req.files || !req.files.thumbnail || !req.files.images)
-        throw new ApiError(400, "thumbnail and images are required!!")
+            console.log('image doc ', newImage);
 
-    // take the images paths
-    thumbnail = req.files.thumbnail[0].path
-    images = req.files.images.map(image => image.path)
+            newImages.push({
+                image: newImage._id,
+                is_main
+            })
+        }
 
-    // upload thumbnail on cloudinary and create the image document
-    thumbnail = await uploadOnCloudinary(thumbnail)
-    thumbnail = await imageModel.create({ url: thumbnail.url, public_id: thumbnail.public_id, productId: product._id })
+        console.log('image docs', newImages);
 
-    // newImages-> {_id,url,productId,public_id}
-    // upload images on cloudinary and create and push the image document into newImages
-    const newImages = []
-    for (let i = 0; i < images.length; i++) {
-        let response = await uploadOnCloudinary(images[i])
-        let imageDoc = await imageModel.create({
-            url: response.url,
-            public_id: response.public_id,
-            productId: product._id
-        })
-        newImages.push(imageDoc)
+        newColors.push({ color, images: newImages })
     }
 
-    // push the thumbnail and newImages into the product
-    product.thumbnail = thumbnail._id
-    newImages.forEach((image) => {
-        product.images.push(image._id)
-    });
+    console.log('final colors', newColors);
+
+    product.colors = newColors
 
     // finally save the product
     await product.save()
 
     res.status(200).json({
         success: true,
-        message: 'product created successfully'
+        message: 'product created successfully',
+        product
     })
 }
 )
@@ -164,7 +223,7 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 
     // owner must be the id
     if (owner) {
-        matchStage.owner = new mongoose.Types.ObjectId(owner)
+        matchStage.owner = mongoose.Types.ObjectId.createFromHexString(owner)
     }
 
     // if rating is given for filtering then filter by rating
@@ -181,7 +240,9 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
         $facet: {
             data: [
                 { $match: matchStage },
+                // will skip previous products --> for 11 to 20 , skip 1 to 10
                 { $skip: (parseInt(page) - 1) * parseInt(limit) },
+                // only take 10 products
                 { $limit: parseInt(limit) },
                 {
                     $lookup: {
@@ -213,8 +274,9 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
                         discount: 1,
                         'thumbnail.url': 1,
                         'owner.fullname': 1,
+                        'owner._id': 1,
                         rating: 1,
-                        stocks: 1,
+                        totalStocks: 1,
                         category: 1
                     }
                 }
@@ -240,8 +302,6 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     // Execute the aggregation pipeline
     const result = await productModel.aggregate(pipeline)
 
-    console.log(result);
-
     // get all the products
     const products = result[0].data;
     const filteredTotal = result[0].filteredTotal.length ? result[0].filteredTotal[0].count : 0;
@@ -249,8 +309,6 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 
     // Get approximate total count using $collStats
     // const overallTotal = await productModel.countDocuments()
-
-    console.log('total products ', overallTotal);
 
     res.json({
         products,
@@ -269,25 +327,11 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
     const { id } = req.params
     // product is an array
     const product = await productModel.aggregate([
+        // find the product using provided id
         {
             $match: { _id: mongoose.Types.ObjectId.createFromHexString(id) }
         },
-        {
-            $lookup: {
-                from: 'images',
-                localField: 'thumbnail',
-                foreignField: '_id',
-                as: 'thumbnail'
-            }
-        },
-        {
-            $lookup: {
-                from: 'images',
-                localField: 'images',
-                foreignField: '_id',
-                as: 'images'
-            }
-        },
+        // take the user info in an array named owner
         {
             $lookup: {
                 from: 'users',
@@ -296,8 +340,22 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
                 as: 'owner'
             }
         },
+        // take all the images of the product
         {
-            $unwind: '$thumbnail'
+            $lookup: {
+                from: 'images',
+                localField: 'colors.images.image',
+                foreignField: '_id',
+                as: 'productImages'
+            }
+        },
+        {
+            $lookup: {
+                from: 'reviews',
+                localField: 'review',
+                foreignField: '_id',
+                as: 'productReviews'
+            }
         },
         {
             $unwind: '$owner'
@@ -308,18 +366,42 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
                 product_name: 1,
                 price: 1,
                 discount: 1,
-                'thumbnail.url': 1,
-                'owner.fullname': 1,
-                'images.url': 1,
                 rating: 1,
                 stocks: 1,
                 category: 1,
                 details: 1,
                 keyHighlights: 1,
-                colors: 1,
                 sizes: 1,
-                related_products: 1,
-                review: 1
+                description: 1,
+                'owner.fullname': 1,
+                'owner._id': 1,
+                colors: {
+                    // apply map function 
+                    $map: {
+                        // on the colors array
+                        input: "$$colors",
+                        // each variable will be named as color
+                        as: "$$color",
+                        // what does the output object will look like
+                        in: {
+                            // will have a color , take the color from color object
+                            color: "$$color.color",
+                            // will have an array of images
+                            images: {
+                            // only take the images which belongs to that color
+                                $filter: {
+                                    // applying filter to populated images 
+                                    input: "$productImages",
+                                    // every variable will be named as image
+                                    as: "image",
+                                    // searching if the image's reference is in the color
+                                    // when matches filer will take the populated image document 
+                                    cond: { $in: ["$$image._id", "$$color.images.image"] }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     ])

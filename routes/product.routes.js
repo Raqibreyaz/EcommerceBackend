@@ -9,7 +9,7 @@ const router = express.Router()
 
 const fields = [
     {
-        name: 'thumbnail',
+        name: 'mainImage',
         maxCount: 1,
     },
     {
@@ -24,7 +24,7 @@ router.use('/category', categoryRouter)
 
 router.use('/review', reviewRouter)
 
-router.route('/addnew').post(verifyAdminOrSeller, upload.fields(fields), addNewProduct)
+router.route('/addnew').post( upload.any(), addNewProduct)
 
 router.route('/get-products').get(fetchProducts)
 

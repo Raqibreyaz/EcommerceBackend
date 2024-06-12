@@ -2,10 +2,18 @@ import mongoose from "mongoose";
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 
+const addressSchema = new mongoose.Schema({
+    state: String,
+    city: String,
+    pincode: Number,
+    house_no: String,
+})
+
 const userSchema = new mongoose.Schema({
     fullname: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     email: {
         type: String,
@@ -13,6 +21,15 @@ const userSchema = new mongoose.Schema({
         trim: true,
         required: true,
         unique: true,
+    },
+    phoneNo: {
+        type: String,
+        required: true
+    },
+    avatar: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'image',
+        required: true
     },
     password: {
         type: String,
@@ -27,26 +44,16 @@ const userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "wishlist"
     },
-    orders: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "order"
-        }
-    ],
     role: {
         type: String,
-        enum: ['customer', 'seller', 'admin'],
-        default: 'user',
+        enum: ['customer', 'seller', 'admin', 'delivery boy'],
+        default: 'customer',
         index: true
     },
-    addresses: [
-        {
-            state: String,
-            city: String,
-            pincode: Number,
-            house_no: String
-        }
-    ],
+    addresses: {
+        type: [addressSchema],
+        required: true
+    },
 
 })
 
@@ -64,7 +71,7 @@ userSchema.methods.comparePassword = async function (password) {
 }
 
 userSchema.methods.generateToken = function () {
-    return jwt.sign({ id: this._id }, process.env.JWT_SECRET_KEY)
+    return jwt.sign({ id: this._id }, process.env.JWT_SECRET_KEY, { expiresIn: process.env.JWT_EXPIRY })
 }
 
 export default mongoose.model('user', userSchema)

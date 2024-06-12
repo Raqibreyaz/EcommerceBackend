@@ -1,29 +1,27 @@
 import mongoose from "mongoose";
 import mongoosePaginate from "mongoose-paginate-v2";
+import { validate } from "uuid";
 
-const sizeSchema = new mongoose.Schema({
-    size: {
+const colorSchema = new mongoose.Schema({
+    color: {
         type: String,
-        default: "free size"
+        unique: true
     },
-    colors: [
+    images: [
         {
-            color: {
-                type: String,
-                required: true
+            image: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'image'
             },
-            stocks: {
-                type: Number,
-                required: true
+            is_main: {
+                type: Boolean,
+                default: false
             }
         }
     ]
-
 })
 
 const productSchema = new mongoose.Schema({
-
-// TODO: bind every image with a color
 
     product_name: {
         type: String,
@@ -36,7 +34,15 @@ const productSchema = new mongoose.Schema({
         required: true,
         index: true
     },
-    stocks: {
+    isReturnable: {
+        type: Boolean,
+        default: true
+    },
+    returnPolicy: {
+        type: String,
+        required: true
+    },
+    totalStocks: {
         type: Number,
         required: true
     },
@@ -56,34 +62,49 @@ const productSchema = new mongoose.Schema({
         index: true
     },
     keyHighlights: {
-        type: String,
+        type: [String],
         required: true,
-        minLength: [10, "keyHighlights must be at least of 10 characters"]
-    },
-    thumbnail: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'image',
+        validate: {
+            validator: function (v) {
+                return v.length >= 1
+            },
+            message: "at least 1 key highlight is required"
+        }
     },
     owner: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
         index: true
     },
-    colors: {
-        type: [String],
-        required: true,
+    thumbnail: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'image',
     },
-    images: [
+    colors: [colorSchema],
+    sizes: {
+        type: [String],
+        uppercase: true,
+        required: true,
+        validate: {
+            validator: function (v) {
+                return v.length === new Set(v).size
+            },
+            message: "sizes must be unique"
+        },
+    },
+    stocks: [
         {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'image',
+            size: String,
+            color: String,
+            stock: Number
         }
     ],
-    sizes: [sizeSchema],
     rating: {
         type: Number,
         default: 4,
-        index: true
+        index: true,
+        min: 0,
+        max: 5
     },
     details: {
         type: String,
@@ -94,13 +115,8 @@ const productSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'review'
     },
-    related_products: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'product'
-        }
-    ],
-}, { timestamps: true })
+},
+    { timestamps: true })
 
 productSchema.plugin(mongoosePaginate)
 
