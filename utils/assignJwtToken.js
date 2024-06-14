@@ -4,7 +4,7 @@ export const assignJwtToken = (user, res, message) => {
 
     let tokenName = `${user.role}Token`
 
-    let token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: process.env.JWT_EXPIRY })
+    let token = jwt.sign({ id: user._id,role:user.role }, process.env.JWT_SECRET_KEY, { expiresIn: process.env.JWT_EXPIRY })
 
     res
         .status(200)

@@ -48,9 +48,6 @@ import { application } from 'express'
 // this function just adds a new product 
 const addNewProduct = catchAsyncError(async (req, res, next) => {
 
-
-    // consider adding info of the owner like id
-
     // taking all the provided text data
     let {
         product_name,
@@ -68,7 +65,6 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         stocks,
     } = req.body;
 
-    console.log('parsing data to object fron json');
 
     keyHighlights = JSON.parse(keyHighlights)
     sizes = JSON.parse(sizes)
@@ -92,19 +88,14 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
                 }
             })
 
-        console.log(images);
-
         return {
             color,
             images
         }
     })
     keyHighlights = keyHighlights.map(({ highlight }) => highlight)
+
     sizes = sizes.map(({ size }) => size)
-
-    console.log('going to get thumbnail');
-
-    console.log(req.files);
 
     let thumbnail = ''
 
@@ -116,24 +107,26 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
     }
 
     console.log(thumbnail);
+    console.log(req.files);
 
     const thumbnailRes = await uploadOnCloudinary(thumbnail.path)
 
-    const newThumbnail = await imageModel.create({
-        docId: product._id,
-        url: thumbnailRes.url,
-        public_id: thumbnailRes.public_id
-    })
+    // const newThumbnail = await imageModel.create({
+    //     url: thumbnailRes.url,
+    //     public_id: thumbnailRes.public_id
+    // })
 
-    console.log('finding category');
     // take the given category first
+
     let productCategory = await categoryModel.findOne({ name: category.toLowerCase() })
     if (!productCategory) {
         throw new ApiError(404, "category does not exist")
     }
 
-    console.log('creating product');
-    // creating the product 
+    let owner = req.user.id
+
+    console.log(owner);
+
     const product = await productModel.create({
         product_name,
         price,
@@ -146,11 +139,11 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         category,
         keyHighlights,
         sizes,
+        owner,
         details,
         stocks,
     })
 
-    console.log('taking images uploading to cloudinary');
     let newColors = []
     // take the color and its images
     for (const { color, images } of colors) {
@@ -159,26 +152,22 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         for (const { image, is_main } of images) {
             // take the image ,upload on cloudinary , create a new imagedoc and append it in newImages
             let cloudinaryResponse = await uploadOnCloudinary(image)
-            let newImage = await imageModel.create({
-                docId: product._id,
-                url: cloudinaryResponse.url,
-                public_id: cloudinaryResponse.public_id
-            })
-
-            console.log('image doc ', newImage);
+            // let newImage = await imageModel.create({
+            //     url: cloudinaryResponse.url,
+            //     public_id: cloudinaryResponse.public_id
+            // })
 
             newImages.push({
-                image: newImage._id,
+                image: {
+                    url: cloudinaryResponse.url,
+                    
+                },
                 is_main
             })
         }
 
-        console.log('image docs', newImages);
-
         newColors.push({ color, images: newImages })
     }
-
-    console.log('final colors', newColors);
 
     product.colors = newColors
 
@@ -201,6 +190,8 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     // const products = await productModel.find({}).limit(limit).skip((page - 1) * limit)
 
     const { page = 1, limit = 10, category, min_discount, owner, min_price, max_price, rating, sort_by, order = 'asc' } = req.query;
+
+    console.log(req.query);
 
     const pipeline = [];
 
@@ -324,87 +315,172 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 
     // TODO: consider related products
 
+    // take the product id from params
     const { id } = req.params
-    // product is an array
-    const product = await productModel.aggregate([
-        // find the product using provided id
-        {
-            $match: { _id: mongoose.Types.ObjectId.createFromHexString(id) }
-        },
-        // take the user info in an array named owner
-        {
-            $lookup: {
-                from: 'users',
-                localField: 'owner',
-                foreignField: '_id',
-                as: 'owner'
-            }
-        },
-        // take all the images of the product
-        {
-            $lookup: {
-                from: 'images',
-                localField: 'colors.images.image',
-                foreignField: '_id',
-                as: 'productImages'
-            }
-        },
-        {
-            $lookup: {
-                from: 'reviews',
-                localField: 'review',
-                foreignField: '_id',
-                as: 'productReviews'
-            }
-        },
-        {
-            $unwind: '$owner'
-        },
-        {
-            $project: {
-                _id: 1,
-                product_name: 1,
-                price: 1,
-                discount: 1,
-                rating: 1,
-                stocks: 1,
-                category: 1,
-                details: 1,
-                keyHighlights: 1,
-                sizes: 1,
-                description: 1,
-                'owner.fullname': 1,
-                'owner._id': 1,
-                colors: {
-                    // apply map function 
-                    $map: {
-                        // on the colors array
-                        input: "$$colors",
-                        // each variable will be named as color
-                        as: "$$color",
-                        // what does the output object will look like
-                        in: {
-                            // will have a color , take the color from color object
-                            color: "$$color.color",
-                            // will have an array of images
-                            images: {
-                            // only take the images which belongs to that color
-                                $filter: {
-                                    // applying filter to populated images 
-                                    input: "$productImages",
-                                    // every variable will be named as image
-                                    as: "image",
-                                    // searching if the image's reference is in the color
-                                    // when matches filer will take the populated image document 
-                                    cond: { $in: ["$$image._id", "$$color.images.image"] }
+
+    const product = await productModel.aggregate(
+        [
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId.createFromHexString(id)
+                }
+            },
+            {
+                $lookup: {
+                    from: "images",
+                    localField: "colors.images.image",
+                    foreignField: "_id",
+                    as: "imageDetails"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "owner",
+                    foreignField: "_id",
+                    as: "ownerDetails"
+                }
+            },
+            {
+                $lookup: {
+                    from: "reviews",
+                    localField: "reviews",
+                    foreignField: "_id",
+                    as: "productReviews"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "productReviews.userId",
+                    foreignField: "_id",
+                    as: "reviewers"
+                }
+            },
+            {
+                $lookup: {
+                    from: 'images',
+                    localField: "reviewers.avatar",
+                    foreignField: "_id",
+                    as: "reviewersImages",
+                }
+            },
+            {
+                $addFields: {
+                    colors: {
+                        $map: {
+                            input: "$colors",
+                            as: "color",
+                            in: {
+                                color: "$$color.color",
+                                images: {
+                                    $map: {
+                                        input: "$$color.images",
+                                        as: "imageObj",
+                                        in: {
+                                            image: {
+                                                // taking 0th element from the returned array
+                                                $arrayElemAt: [
+                                                    {
+                                                        // finding the populated image which have the given id
+                                                        $map: {
+                                                            input: "$imageDetails",
+                                                            as: "imageDetail",
+                                                            in: {
+                                                                $cond: {
+                                                                    if: { eq: ["$$imageDetail._id", "$$imageObj.image"] },
+                                                                    then: {
+                                                                        _id: "$$imageDetail._id",
+                                                                        url: "$$imageDetail.url"
+                                                                    },
+                                                                    else: null
+                                                                }
+                                                            },
+                                                        }
+                                                    }, {
+                                                        $indexOfArray: ["$imageDetails._id", "$$imageObj.image"]
+                                                    }
+                                                ]
+                                            },
+                                            is_main: "$$imageObj.is_main"
+                                        }
+                                    }
                                 }
                             }
                         }
+                    },
+                    reviews: {
+                        $map: {
+                            input: "$productReviews",
+                            as: "review",
+                            in: {
+                                user: {
+                                    $arrayElemAt: [
+                                        {
+                                            $map: {
+                                                input: "$reviewers",
+                                                as: "reviewer",
+                                                in: {
+                                                    $cond: {
+                                                        if: { $eq: ["$$reviewer._id", "$$review.userId"] },
+                                                        then: {
+                                                            fullname: "$$reviewer.fullname",
+                                                            avatar: {
+                                                                $arrayElemAt: [
+                                                                    {
+                                                                        $filter: {
+                                                                            input: "$reviewersImages",
+                                                                            as: "reviewerImage",
+                                                                            cond: { $eq: ["reviewer.avatar", "reviewerImage._id"] }
+                                                                        }
+                                                                    }
+                                                                    , 0]
+                                                            },
+                                                        },
+                                                        else: null
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            $indexOfArray: ["$reviewers._id", "$$review.userId"]
+                                        }
+                                    ]
+                                },
+                                oneWord: "$$review.oneWord",
+                                review: "$$review.review",
+                                rating: "review.rating"
+                            }
+                        }
+                    },
+                    owner: {
+                        $arrayElemAt: [
+                            {
+                                $map: {
+                                    input: "$ownerDetails",
+                                    as: "ownerDetail",
+                                    in: {
+                                        fullname: "$$ownerDetail.fullname",
+                                        _id: "$$ownerDetail._id"
+                                    }
+                                }
+                            }
+                            , 0]
                     }
                 }
+            },
+            {
+                $project: {
+                    reviewersImages: 0,
+                    reviewers: 0,
+                    imageDetails: 0,
+                    productReviews: 0,
+                    ownerDetails: 0,
+                    thumbnail: 0
+                }
             }
-        }
-    ])
+        ]
+    );
 
     res.status(200).json({
         success: true,
@@ -528,19 +604,23 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
     if (!productId)
         throw new ApiError(400, "provide an id to delete")
 
-    // fetch and delete all images associated with the product
-    let imageDocs = await imageModel.find({ productId })
+    let product = await productModel.findById(productId)
 
-    if (!imageDocs.length)
-        throw new ApiError(400, "provide a valid email id")
+    let thumbnail = product.thumbnail
 
-    for (const imageDoc of imageDocs) {
-        await deleteFromCloudinary(imageDoc.public_id)
-        await imageModel.findByIdAndDelete(imageDoc._id)
-    }
+    // // fetch and delete all images associated with the product
+    // let imageDocs = await imageModel.find({ productId })
 
-    // finally deleting the product
-    await productModel.findByIdAndDelete(productId)
+    // if (!imageDocs.length)
+    //     throw new ApiError(400, "provide a valid product id")
+
+    // for (const imageDoc of imageDocs) {
+    //     await deleteFromCloudinary(imageDoc.public_id)
+    //     await imageModel.findByIdAndDelete(imageDoc._id)
+    // }
+
+    // // finally deleting the product
+    // await productModel.findByIdAndDelete(productId)
 
     res.status(200).json({
         success: true,

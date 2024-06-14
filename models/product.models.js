@@ -2,6 +2,15 @@ import mongoose from "mongoose";
 import mongoosePaginate from "mongoose-paginate-v2";
 import { validate } from "uuid";
 
+const imageSchema = new mongoose.Schema({
+    url: {
+        type: String,
+    },
+    public_id: {
+        type: String,
+    }
+})
+
 const colorSchema = new mongoose.Schema({
     color: {
         type: String,
@@ -9,10 +18,7 @@ const colorSchema = new mongoose.Schema({
     },
     images: [
         {
-            image: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'image'
-            },
+            image: imageSchema,
             is_main: {
                 type: Boolean,
                 default: false
@@ -32,7 +38,8 @@ const productSchema = new mongoose.Schema({
     price: {
         type: Number,
         required: true,
-        index: true
+        index: true,
+        min: 0
     },
     isReturnable: {
         type: Boolean,
@@ -44,12 +51,14 @@ const productSchema = new mongoose.Schema({
     },
     totalStocks: {
         type: Number,
-        required: true
+        required: true,
+        min: 0
     },
     discount: {
         type: Number,
         default: 0,
-        index: true
+        index: true,
+        min: 0
     },
     description: {
         type: String,
@@ -111,10 +120,10 @@ const productSchema = new mongoose.Schema({
         required: true,
         minLength: [10, "details must be at least of 10 characters"]
     },
-    reviews: {
+    reviews: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'review'
-    },
+    }],
 },
     { timestamps: true })
 

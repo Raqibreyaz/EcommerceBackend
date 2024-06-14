@@ -24,13 +24,13 @@ router.use('/category', categoryRouter)
 
 router.use('/review', reviewRouter)
 
-router.route('/addnew').post( upload.any(), addNewProduct)
+router.route('/addnew').post(verifyAdminOrSeller, upload.any(), addNewProduct)
 
 router.route('/get-products').get(fetchProducts)
 
 router.route('/get-product/:id').get(fetchProductDetails)
 
-router.route('/edit-product/:id').put(verifyAdminOrOwner, upload.fields(fields), editProduct)
+router.route('/edit-product/:id').put(verifyAdminOrOwner, upload.any(), editProduct)
 
 router.route('/delete-product/:id').delete(verifyAdmin, deleteProduct)
 

@@ -29,7 +29,6 @@ const userSchema = new mongoose.Schema({
     avatar: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'image',
-        required: true
     },
     password: {
         type: String,
