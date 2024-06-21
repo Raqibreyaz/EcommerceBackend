@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
+import { validate } from "uuid";
 
 const addressSchema = new mongoose.Schema({
     state: String,
@@ -27,8 +28,14 @@ const userSchema = new mongoose.Schema({
         required: true
     },
     avatar: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'image',
+        url: {
+            type: String,
+            required: true
+        },
+        public_id: {
+            type: String,
+            required: true
+        }
     },
     password: {
         type: String,
@@ -51,7 +58,13 @@ const userSchema = new mongoose.Schema({
     },
     addresses: {
         type: [addressSchema],
-        required: true
+        required: true,
+        validate: {
+            validator: (v) => (
+                v.length >= 1
+            ),
+            message: "address is required"
+        }
     },
 
 })

@@ -1,13 +1,15 @@
-import mongoose from "mongoose";
+import mongoose, { trusted } from "mongoose";
 import mongoosePaginate from "mongoose-paginate-v2";
 import { validate } from "uuid";
 
 const imageSchema = new mongoose.Schema({
     url: {
         type: String,
+        required:true
     },
     public_id: {
         type: String,
+        required:true
     }
 })
 
@@ -85,15 +87,13 @@ const productSchema = new mongoose.Schema({
         ref: 'user',
         index: true
     },
-    thumbnail: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'image',
-    },
+    thumbnail: imageSchema,
     colors: [colorSchema],
     sizes: {
         type: [String],
         uppercase: true,
         required: true,
+        // sizes must be unique
         validate: {
             validator: function (v) {
                 return v.length === new Set(v).size

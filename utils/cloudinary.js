@@ -3,6 +3,10 @@ import fs from 'fs'
 
 
 export const uploadOnCloudinary = async (filepath) => {
+
+    if (!filepath)
+        return;
+
     try {
         let uploadResponse = await cloudinary.uploader.upload(filepath)
         fs.unlink(filepath, (err) => {
@@ -23,6 +27,10 @@ export const uploadOnCloudinary = async (filepath) => {
 }
 
 export const deleteFromCloudinary = async (publicId) => {
+
+    if (!publicId)
+        return;
+    
     try {
         let deleteResponse = await cloudinary.uploader.destroy(publicId)
         return deleteResponse

@@ -5,23 +5,19 @@ import { cartModel } from '../models/CartAndOrder.models.js'
 import { assignJwtToken } from '../utils/assignJwtToken.js'
 import productModel from '../models/product.models.js'
 import { uploadOnCloudinary } from '../utils/cloudinary.js'
-import imageModel from '../models/image.models.js'
 
 const registerUser = catchAsyncError(async (req, res, next) => {
 
     let { fullname, email, password, phoneNo, address, role = 'customer' } = req.body
+
     let avatar = req.file
+
+    address = JSON.parse(address)
 
     if (await userModel.findOne({ email }))
         throw new ApiError(400, "user already exists")
 
     const cloudinaryResponse = await uploadOnCloudinary(avatar.path)
-
-    avatar = await imageModel.create({
-        url: cloudinaryResponse.url,
-        public_id: cloudinaryResponse.public_id
-    })
-
 
     const response = await userModel.find({ role: 'admin' })
 
@@ -34,34 +30,21 @@ const registerUser = catchAsyncError(async (req, res, next) => {
         email,
         phoneNo,
         password,
-        address,
+        addresses: [address],
         role,
-        avatar: avatar._id
+        avatar: {
+            url: cloudinaryResponse.url,
+            public_id: cloudinaryResponse.public_id
+        }
     })
 
     // create and give cart to the user
     const cart = await cartModel.create({ userId: user._id })
-    user.cart = cart.id;
+    user.cart = cart._id;
+
+    await user.save()
 
     assignJwtToken(user, res, "user created successfully")
-}
-)
-
-const registerAdmin = catchAsyncError(async (req, res, next) => {
-
-    const response = await userModel.find({ role: 'admin' })
-
-    if (response.length > 0)
-        throw new ApiError(400, "Invalid Request")
-
-    req.body.role = 'admin'
-    await registerUser(req, res, next)
-}
-)
-
-const registerCustomer = catchAsyncError(async (req, res, next) => {
-    req.body.role = 'customer'
-    await registerUser(req, res, next)
 }
 )
 
@@ -89,10 +72,6 @@ const loginUser = catchAsyncError(async (req, res, next) => {
 const fetchUser = catchAsyncError(async (req, res, next) => {
     const userId = req.user.id
     const user = await userModel.findById(userId).select("-password")
-
-    const image = await imageModel.findById(user.avatar).select('-public_id')
-
-    user.avatar = image
 
     if (!user)
         throw new ApiError(404, "user does not exist")

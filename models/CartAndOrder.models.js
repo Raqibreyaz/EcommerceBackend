@@ -13,20 +13,26 @@ const cartSchema = new mongoose.Schema({
                 type: mongoose.Schema.Types.ObjectId,
                 ref: "product"
             },
+            // chosen quantity
             quantity: {
                 type: Number,
-                default: 0
+                default: 1
             },
+            // chosen size
             size: {
                 type: String,
-                default: 'free size'
+                required:true
             },
+            // chosen color
             color: {
                 type: String,
+                required:true
+            },
+            // corresponding image
+            image: {
+                type: String,
+                required:true
             }
-        //     image: {
-        //         type: String  //url of the image
-        //     }
         }
     ]
 })

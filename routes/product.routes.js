@@ -30,7 +30,7 @@ router.route('/get-products').get(fetchProducts)
 
 router.route('/get-product/:id').get(fetchProductDetails)
 
-router.route('/edit-product/:id').put(verifyAdminOrOwner, upload.any(), editProduct)
+router.route('/edit-product').put(verifyAdminOrOwner, upload.any(), editProduct)
 
 router.route('/delete-product/:id').delete(verifyAdmin, deleteProduct)
 

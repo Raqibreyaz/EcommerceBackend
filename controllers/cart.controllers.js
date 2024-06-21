@@ -3,128 +3,227 @@ import { cartModel } from "../models/CartAndOrder.models.js";
 import mongoose from "mongoose";
 import productModel from "../models/product.models.js";
 import { ApiError } from "../utils/ApiError.js";
+import userModel from '../models/user.models.js'
 
 // responsible to add product to cart and update it quantity
 const addToCart = catchAsyncError(async (req, res, next) => {
 
-    const { id: userId } = req.user;
-    const { id: productId } = req.params;
+    const { id: userId } = req.user
+    let { productId, color, size, quantity } = req.body
 
-    // there can be more than one same products so it will be differentiated by color,size
-    let { quantity, size, color } = req.body;
+    quantity = parseInt(quantity)
 
-    let message = "product updated successfully"
+    const product = await productModel.findById(productId)
 
-    // check if we have required stocks available
-    let product = await productModel.findById(productId)
-    let colorObj = product.sizes.find(sizeObj => sizeObj.size === size).colors.find(colorObj => colorObj.color === color)
-    if (colorObj.stocks < quantity)
-        throw new ApiError(400, `sorry we have only ${colorObj.stocks} stocks left`)
+    let availableStocks = 0
 
-    // Try to update the quantity of the product if it exists in the cart
-    let result = await cartModel.findOneAndUpdate(
-        // By specifying "products.productId": productId, you are telling MongoDB to find documents where there exists at least one element in the products array with a productId field equal to the provided productId value.
-        { userId, "products.product": productId, "products.color": color, "products.size": size },
-        // $ is the searched element having the productId , so we increment its quantity
-        { $set: { "products.$.quantity": quantity } },
-        { new: true }
-    )
+    // take available stocks
+    let stockCheck = product.stocks.filter((stockObj) => {
+        console.log('stock check ',stockObj);
+        if (stockObj.color === color && stockObj.size === size) {
+            availableStocks = stockObj.stock
+            return stockObj.stock >= quantity
+        }
+        return false
+    })
 
-    // If the product doesn't exist in the cart, add it
-    if (!result) {
-        result = await cartModel.findOneAndUpdate(
-            // find the cart and add it 
-            { userId },
-            // push the product if it is not in the cart
-            { $push: { products: { product: productId, quantity, size, color } } },
-            { new: true, upsert: true }
-        );
-        message = "product successfully added to cart"
+    console.log(stockCheck,availableStocks,quantity);
+
+    // condition when stocks are unavailable
+    if (availableStocks <= quantity) {
+        let message = "chosen quantity for this size and color is not available"
+        throw new ApiError(400, availableStocks !== 0 ? message : "stocks for this color and size not available right now!!")
     }
+
+    const userCart = await cartModel.findOne({ userId })
+
+    let productIndex = userCart.products.findIndex(p => p.product.equals(productId) && p.size && p.color)
+
+    if (productIndex >= 0) {
+        userCart.products[productIndex].quantity = quantity
+    }
+    else {
+
+        // first find the doc having that color
+        const image = product.colors.filter((productColor) => {
+            return productColor.color === color
+            // it will return an array we want 0th elem ,it has the images array containing the main image
+            // it will return an array we want 0th elem its image keys url has the image url
+        })[0].images.filter(image => image.is_main)[0].image.url
+
+        userCart.products.push({
+            product: product._id,
+            quantity,
+            size,
+            color,
+            image
+        })
+    }
+
+    await userCart.save()
 
     res.status(200).json({
         success: true,
-        message,
-        cart: result
+        message: "operation successfull",
     })
 }
 )
 
-const updateProductFromCart = catchAsyncError(async (req,res,next) => {
-  
-}
-)
-
+// fetching cart by updating if any product not available
 const fetchCart = catchAsyncError(async (req, res, next) => {
     const { id: userId } = req.user
 
-    const userCart = await cartModel.aggregate([
-        // Step 1: Match the cart by userId
-        { $match: { userId: mongoose.Types.ObjectId.createFromHexString(userId) } },
-        // Step 2: Unwind the products array
-        { $unwind: "$products" },
-        // Step 3: Lookup product details from the product collection
-        {
-            $lookup: {
-                from: "products",
-                localField: "products.product",
-                foreignField: "_id",
-                as: "productDetails"
-            }
-        },
-        // Step 4: Unwind the productDetails array
-        { $unwind: "$productDetails" },
-        // Step 5: Add product details to the products field
-        {
-            $addFields: {
-                "products.product_name": "$productDetails.product_name",
-                "products.price": "$productDetails.price",
-                "products.discount": "$productDetails.discount",
-                "products.category": "$productDetails.category",
-                "products.owner": "$productDetails.owner",
-                // TODO: to be removed in future
-                "products.image": "$productDetails.thumbnail"
-            }
-        },
-        // Step 6: Lookup owner details from the user collection
-        {
-            $lookup: {
-                from: "users",
-                localField: "products.owner",
-                foreignField: "_id",
-                as: "ownerDetails"
-            }
-        },
-        // Step 7: Unwind the ownerDetails array
-        { $unwind: "$ownerDetails" },
-        // Step 8: Add owner name to the products field
-        {
-            $addFields: {
-                "products.owner.name": "$ownerDetails.fullname"
-            }
-        },
-        // Step 9: Group back to array format
-        {
-            $group: {
-                _id: "$_id",
-                userId: { $first: "$userId" },
-                products: { $push: "$products" }
-            }
-        },
-        // Step 10: Project the final format
-        {
-            $project: {
-                _id: 1,
-                userId: 1,
-                products: 1
-            }
+    const userCart = await cartModel.findOne({ userId }).lean();
+
+    if (userCart.products.length === 0) {
+        res.status(200).json({
+            success: true,
+            message: "cart fetched successfully",
+            userCart: []
+        })
+    }
+
+    const productIds = userCart.products.map(cp => cp.product.toString());
+
+    // lean makes the doc as plane javascript object
+    const products = await productModel.find({ _id: { $in: productIds } }).lean();
+    const productMap = {};
+    products.forEach(product => {
+        productMap[product._id.toString()] = product;
+    });
+
+    const ownerIds = products.map(p => p.owner.toString());
+    const owners = await userModel.find({ _id: { $in: ownerIds } }).lean();
+    const ownerMap = {};
+    owners.forEach(owner => {
+        ownerMap[owner._id.toString()] = owner;
+    });
+
+    let toSave = false;
+    let discardedProductsIndex = {};
+    let cartProducts = [];
+
+    userCart.products.forEach((cartProduct, i) => {
+        const product = productMap[cartProduct.product.toString()];
+
+        if (!product) {
+            toSave = true;
+            discardedProductsIndex[i] = true;
+            return;
         }
-    ]);
+
+        const sizeIndex = product.sizes.indexOf(cartProduct.size);
+        if (sizeIndex === -1) {
+            toSave = true;
+            discardedProductsIndex[i] = true;
+            return;
+        }
+
+        const colorObj = product.colors.find(colorObj => colorObj.color === cartProduct.color);
+        if (!colorObj) {
+            toSave = true;
+            discardedProductsIndex[i] = true;
+            return;
+        }
+
+        const stockObj = product.stocks.find(stockObj => (
+            stockObj.color === cartProduct.color && stockObj.size === cartProduct.size
+        ));
+
+        if (!stockObj || stockObj.stock < cartProduct.quantity) {
+            return;
+        }
+
+        const image = colorObj.images.find(image => image.is_main)?.image.url || '';
+
+        const owner = ownerMap[product.owner.toString()];
+
+        cartProducts.push({
+            product_name: product.product_name,
+            price: product.price,
+            discount: product.discount,
+            category: product.category,
+            owner: {
+                fullname: owner.fullname
+            },
+            image,
+            quantity: cartProduct.quantity,
+            product: cartProduct.product,
+            size: cartProduct.size,
+            color: cartProduct.color
+        });
+    });
+
+    if (toSave) {
+        userCart.products = userCart.products.filter((_, index) => !discardedProductsIndex[index]);
+        await userCart.save();
+    }
+
+    // const userCart = await cartModel.aggregate([
+    //     // Step 1: Match the cart by userId
+    //     { $match: { userId: mongoose.Types.ObjectId.createFromHexString(userId) } },
+    //     // Step 2: Unwind the products array
+    //     { $unwind: "$products" },
+    //     // Step 3: Lookup product details from the product collection
+    //     {
+    //         $lookup: {
+    //             from: "products",
+    //             localField: "products.product",
+    //             foreignField: "_id",
+    //             as: "productDetails"
+    //         }
+    //     },
+    //     // Step 4: Unwind the productDetails array
+    //     { $unwind: "$productDetails" },
+    //     // Step 5: Add product details to the products field
+    //     {
+    //         $addFields: {
+    //             "products.product_name": "$productDetails.product_name",
+    //             "products.price": "$productDetails.price",
+    //             "products.discount": "$productDetails.discount",
+    //             "products.category": "$productDetails.category",
+    //             "products.owner": "$productDetails.owner",
+    //         }
+    //     },
+    //     // Step 6: Lookup owner details from the user collection
+    //     {
+    //         $lookup: {
+    //             from: "users",
+    //             localField: "products.owner",
+    //             foreignField: "_id",
+    //             as: "ownerDetails"
+    //         }
+    //     },
+    //     // Step 7: Unwind the ownerDetails array
+    //     { $unwind: "$ownerDetails" },
+    //     // Step 8: Add owner name to the products field
+    //     {
+    //         $addFields: {
+    //             "products.owner.name": "$ownerDetails.fullname"
+    //         }
+    //     },
+    //     // Step 9: Group back to array format
+    //     {
+    //         $group: {
+    //             _id: "$_id",
+    //             userId: { $first: "$userId" },
+    //             products: { $push: "$products" }
+    //         }
+    //     },
+    //     // Step 10: Project the final format
+    //     {
+    //         $project: {
+    //             _id: 1,
+    //             userId: 1,
+    //             products: 1
+    //         }
+    //     }
+    // ]);
 
     res.status(200).json({
         success: true,
         message: "cart fetched successfully",
-        cart: userCart.length ? userCart[0] : {}
+        userCart: cartProducts
     })
 }
 )
@@ -132,28 +231,32 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
 // delete a specific product from the cart
 const deleteProductFromCart = catchAsyncError(async (req, res, next) => {
     let { id: userId } = req.user
-    let { id: productId } = req.params
+    let { productId, color, size } = req.body
 
     userId = mongoose.Types.ObjectId.createFromHexString(userId)
     productId = mongoose.Types.ObjectId.createFromHexString(productId)
 
+    // find and remove the product which have the corresponding id,color,size
     const userCart = await cartModel.findOneAndUpdate(
         { userId },
         // remove the object having the product id
         {
             $pull: {
                 products: {
-                    product: productId
+                    product: productId,
+                    color,
+                    size
                 }
             }
         },
         // mongo db will return the updated document when new:true else return the doc before which was before the updation
         { new: true })
 
+
+
     res.status(200).json({
         success: true,
         message: "product successfully deleted from cart",
-        cart: userCart
     })
 }
 )
