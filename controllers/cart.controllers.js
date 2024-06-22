@@ -11,6 +11,8 @@ const addToCart = catchAsyncError(async (req, res, next) => {
     const { id: userId } = req.user
     let { productId, color, size, quantity } = req.body
 
+    console.log('reached here to add to cart');
+
     quantity = parseInt(quantity)
 
     const product = await productModel.findById(productId)
@@ -19,7 +21,7 @@ const addToCart = catchAsyncError(async (req, res, next) => {
 
     // take available stocks
     let stockCheck = product.stocks.filter((stockObj) => {
-        console.log('stock check ',stockObj);
+        console.log('stock check ', stockObj);
         if (stockObj.color === color && stockObj.size === size) {
             availableStocks = stockObj.stock
             return stockObj.stock >= quantity
@@ -27,7 +29,7 @@ const addToCart = catchAsyncError(async (req, res, next) => {
         return false
     })
 
-    console.log(stockCheck,availableStocks,quantity);
+    console.log(stockCheck, availableStocks, quantity);
 
     // condition when stocks are unavailable
     if (availableStocks <= quantity) {
@@ -37,9 +39,10 @@ const addToCart = catchAsyncError(async (req, res, next) => {
 
     const userCart = await cartModel.findOne({ userId })
 
-    let productIndex = userCart.products.findIndex(p => p.product.equals(productId) && p.size && p.color)
+    let productIndex = userCart.products.findIndex(p => p.product.equals(productId) && p.color === color && p.size === size)
 
     if (productIndex >= 0) {
+        console.log('product already exists increase quantity');
         userCart.products[productIndex].quantity = quantity
     }
     else {

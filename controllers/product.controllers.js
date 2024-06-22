@@ -435,7 +435,6 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
                     imageDetails: 0,
                     productReviews: 0,
                     ownerDetails: 0,
-                    thumbnail: 0
                 }
             }
         ]
@@ -448,14 +447,7 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 }
 )
 
-// TODO: reconsider the logic of this function
 const editProduct = catchAsyncError(async (req, res, next) => {
-
-    // updating stocks
-    // updating images
-    // deescription,price,discount,product_name,category,colors,details,keyHighlights
-
-    const { id: productId } = req.params
 
     let {
         product_name,
@@ -463,99 +455,182 @@ const editProduct = catchAsyncError(async (req, res, next) => {
         discount,
         description,
         category,
-        colors,
         sizes,
         details,
         keyHighlights,
         stocks,
-        //imageIds of every image associated to the product to be deleted
-        imageIds = [],
-        // ids of products []
-        relatedProducts = []
+        oldColors,
+        newColors,
+        productId,
+        isReturnable,
+        returnPolicy,
+        totalStocks,
     } = req.body
 
-    // thumbnail have the imageId of the thumbnail
-    let thumbnail = ''
+    // take all the files of new colors
+    // take all the files which are to be inserted
+    // completely remove all images of a color if it is deleted
+    // when new thumbnail is provided then delete old thumbnail
+    // newMainImage[] , toBeInserted[],newThumbnail , newColors[] ,newColor[].mainImage
 
-    // images will have the image path so that upload on cloudinary
-    let images = []
+    let toBeDeleted = []
+    let newThumbnail = ''
+    const oldProduct = await productModel.findById(productId)
 
-    // if the thumbnail is provided then upload on cloudinary and create the imageModel
-    if (req.files && req.files.thumbnail.length) {
+    // when new files are provided then upload on cloud and store 
+    for (let i = 0; i < req.files.length; i++) {
 
-        thumbnail = req.files.thumbnail[0].path;
+        const { fieldname, path } = req.files[i];
 
-        //upload 
-        let response = await uploadOnCloudinary(thumbnail)
-        // create image model
-        thumbnail = await imageModel.create({ url: response.url, public_id: response.public_id, productId })._id
-    }
+        const cloudinaryResponse = await uploadOnCloudinary(path)
 
-    let newImages = []
-    // if the images are provided then upload on cloudinary and create the imageModel
-    if (req.files && req.files.images.length) {
-        images = req.files.images.map(image => image.path)
+        const regex = /\[(\d+)\]/;
 
-        for (const image of images) {
-            //upload 
-            let response = await uploadOnCloudinary(image)
-            // create image model
-            let imageDoc = await imageModel.create({ url: response.url, public_id: response.public_id, productId })
+        const match = fieldname.match(regex)
 
-            // psuh the id of the image document
-            newImages.push(imageDoc._id)
+        let index = ''
+
+        if (match)
+            index = parseInt(match[1])
+
+        // when index not found new thumbnail is provided
+        if (!index) {
+            newThumbnail = {
+                url: cloudinaryResponse.url,
+                public_id: cloudinaryResponse.public_id
+            }
+            toBeDeleted(oldProduct.thumbnail.public_id)
+        }
+        // when new colors are available
+        else if (fieldname.includes('newColors')) {
+            // newColors[idnex]='red' --> {color:'red',images:[{image:{},is_main}]}
+            const imageObj = {
+                image: {
+                    url: cloudinaryResponse.url,
+                    public_id: cloudinaryResponse.public_id
+                },
+                is_main: fieldname.includes('.mainImage')
+            }
+
+            if (typeof newColors[index] === 'object') {
+                newColors[index].images.push(imageObj)
+            }
+            else {
+                const tempObj = {
+                    color: newColors[index],
+                    images: [imageObj],
+                }
+
+                newColors[index] = tempObj
+            }
+        }
+        // when old colors have changes
+        else {
+            // toBeInserted[] , newMainImage[]
+            // oldColors[{color,images,mainImage,toBeDeleted,colorId}]
+
+            let isMain = false
+
+            // when there is a new mainImage then remove old mainImage
+            if (fieldname.includes('newMainImage')) {
+                isMain = true,
+                    toBeDeleted.push(oldColors[index].mainImage.image.public_id)
+
+                // by doing this we ensure that when a oldMainImage exist then it means the color hasnt any main image
+                oldColors[index].mainImage = null
+            }
+
+            oldColors[index].images.push({
+                image: {
+                    url: cloudinaryResponse.url,
+                    public_id: cloudinaryResponse.public_id
+                },
+                is_main: isMain
+            })
         }
     }
 
-    if (sizes)
-        sizes = JSON.parse(sizes)
-    if (colors)
-        colors = JSON.parse(colors)
+    // deleting images of removed colors
+    for (const { _id, images } of oldProduct.colors) {
 
-    for (let i = 0; i < imageIds.length; i++) {
-        const imageId = imageIds[i]
-        let public_id = await imageModel.findOneAndDelete({ _id: imageId }).public_id
-        await deleteFromCloudinary(public_id)
+        let oldColorId = _id.toString()
+        let check = false
+
+        // checking if the oldColorId matches with updated colors id
+        for (let { colorId } of oldColors) {
+            if (colorId === oldColorId) {
+                check = true
+                break
+            }
+        }
+
+        // when the color is deleted then pick its images for deletion
+        if (!check) {
+            let publicIds = images.map(({ image }) => image.public_id)
+            toBeDeleted = [...toBeDeleted, ...publicIds]
+        }
     }
 
-    // TODO: adding related products to the product
-    // if (relatedProducts.length){
+    // add mainImages to their respective colors
+    oldColors = oldColors.map(({ color, images, mainImage, toBeDeleted: removedImages }) => {
 
-    // }
+        // take images which have to be deleted from that color
+        toBeDeleted = [...toBeDeleted, ...removedImages]
 
-    // TODO: removing the deleted image references from the document
-    // for (const imageId of imageIds) {
-    //     const id = mongoose.Types.ObjectId.createFromHexString(imageId)
+        // mainImage is required
+        if (mainImage) {
+            return {
+                color,
+                images: [...images, mainImage]
+            }
+        }
+        else null
+    })
+        .filter((color) => color ? true : false)
 
-    // }
+    // handled oldColors
+    // handled newColors
+    // handles mainImages
+    // handled removed colors
+    // handled newThumbnail
 
-    const newProduct = {
+    const newUpdatedColors = [...oldColors, ...newColors]
+
+    let newProduct = {
         product_name,
         price,
         discount,
         description,
         category,
-        colors,
         sizes,
         details,
         keyHighlights,
+        stocks,
+        isReturnable,
+        returnPolicy,
+        totalStocks,
+        colors: newUpdatedColors
     }
 
-    if (thumbnail)
-        updatedProduct.thumbnail = thumbnail
-    if (newImages.length)
-        updatedProduct.images = newImages
+    // when theres a new thumbnail then take it
+    if (newThumbnail)
+        newProduct.thumbnail = newThumbnail
 
-    const updatedProduct = await productModel.findByIdAndUpdate(productId, newProduct, { new: true })
+    let updatedProduct = await productModel.findOneAndUpdate({
+
+    })
+
+    // finally deleting the given images
+    for (const public_id of toBeDeleted) {
+        await deleteFromCloudinary(public_id)
+    }
 
     res.status(200).json({
-        success: true,
-        message: 'product updated successfully',
-        product: updatedProduct
+        success:true,
+        message:"product updated successfully"
     })
 }
 )
-
 
 // delete all reviews 
 // delete all images including thumbnail and of colors
