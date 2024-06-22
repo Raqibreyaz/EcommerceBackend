@@ -5,11 +5,11 @@ import { validate } from "uuid";
 const imageSchema = new mongoose.Schema({
     url: {
         type: String,
-        required:true
+        required: true
     },
     public_id: {
         type: String,
-        required:true
+        required: true
     }
 })
 
@@ -28,6 +28,12 @@ const colorSchema = new mongoose.Schema({
         }
     ]
 })
+
+const stockSchema = new mongoose.Schema({
+    size: String,
+    color: String,
+    stock: Number
+}, { _id: false })
 
 const productSchema = new mongoose.Schema({
 
@@ -85,10 +91,22 @@ const productSchema = new mongoose.Schema({
     owner: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
-        index: true
+        index: true,
+        required: true
     },
-    thumbnail: imageSchema,
-    colors: [colorSchema],
+    thumbnail: {
+        type: imageSchema,
+        required: true,
+    },
+    colors: {
+        type: [colorSchema],
+        validate: {
+            validator: function (v) {
+                return v.length > 0
+            },
+            message: "at least one color is required"
+        },
+    },
     sizes: {
         type: [String],
         uppercase: true,
@@ -101,13 +119,16 @@ const productSchema = new mongoose.Schema({
             message: "sizes must be unique"
         },
     },
-    stocks: [
-        {
-            size: String,
-            color: String,
-            stock: Number
+    stocks: {
+        type: [stockSchema],
+        required: true,
+        validate: {
+            validator: (stocksArray) => {
+                return stocksArray.length > 0
+            }
+
         }
-    ],
+    },
     rating: {
         type: Number,
         default: 4,

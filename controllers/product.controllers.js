@@ -1,10 +1,8 @@
 import { catchAsyncError } from '../utils/catchAsyncError.js'
 import productModel from '../models/product.models.js'
-import imageModel from '../models/image.models.js'
 import { ApiError } from '../utils/ApiError.js'
 import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js'
 import categoryModel from '../models/category.models.js'
-import { cartModel } from '../models/CartAndOrder.models.js'
 import reviewModel from '../models/review.models.js'
 import mongoose from 'mongoose'
 
@@ -28,67 +26,102 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         stocks,
     } = req.body;
 
-
-    keyHighlights = JSON.parse(keyHighlights)
-    sizes = JSON.parse(sizes)
-    stocks = JSON.parse(stocks)
-    colors = JSON.parse(colors)
-    isReturnable = Boolean(isReturnable)
-    // [{color:'',images:[{image:imagePath,is_main}]}]
-    colors = colors.map((color, index) => {
-        // is an array containing images path and is_main for that color
-        let images = req.files.filter((file) => file.fieldname.includes(`colors[${index}]`))
-            .map((file) => {
-                if (file.fieldname.includes('mainImage')) {
-                    return {
-                        image: file.path,
-                        is_main: true
-                    }
-                }
-                return {
-                    image: file.path,
-                    is_main: false
-                }
-            })
-
-        return {
-            color,
-            images
-        }
-    })
-    keyHighlights = keyHighlights.map(({ highlight }) => highlight)
-
-    sizes = sizes.map(({ size }) => size)
-
-    let thumbnail = ''
-
-    for (const image of req.files) {
-        if (image.fieldname === 'thumbnail') {
-            thumbnail = image
-            break;
-        }
-    }
-
-    console.log(thumbnail);
-    console.log(req.files);
-
-    const thumbnailRes = await uploadOnCloudinary(thumbnail.path)
-
-    // const newThumbnail = await imageModel.create({
-    //     url: thumbnailRes.url,
-    //     public_id: thumbnailRes.public_id
-    // })
-
-    // take the given category first
-
     let productCategory = await categoryModel.findOne({ name: category.toLowerCase() })
     if (!productCategory) {
         throw new ApiError(404, "category does not exist")
     }
 
+    if (req.files.length === 0)
+        throw new ApiError(400, "Images are Required")
+
+    colors = JSON.parse(colors)
+
+    let colorsImages = {}
+    let thumbnailPath = ''
+
+    req.files.forEach(({ fieldname, path }) => {
+
+        const regex = /\[(\d+)\]/;
+
+        // extract the index from the fieldname
+        const match = fieldname.match(regex)
+        let index = ''
+        console.log(match);
+        if (match) {
+            index = match[1]
+            console.log(index);
+
+            (colorsImages[index] ??= []).push({
+                path,
+                is_main: fieldname.includes('.mainImage')
+            })
+        }
+        else
+            thumbnailPath = path
+    });
+
+    console.log('thumbnail-path', thumbnailPath);
+
+    console.log('given image files ', colorsImages);
+
+    // upload the thumbnail
+    let thumbnailResponse = await uploadOnCloudinary(thumbnailPath)
+
+    // {url,public_id}
+    let thumbnail = {
+        url: thumbnailResponse.url,
+        public_id: thumbnailResponse.public_id
+    }
+
+    let newColorsImages = {}
+
+    // will populate the newColorsImages object
+    for (const index in colorsImages) {
+        if (Object.hasOwnProperty.call(colorsImages, index)) {
+            const ithColorImages = colorsImages[index];
+
+            let temp = []
+
+            // will give an array of images corresponding to that indexThColor
+            // {image:{url,public_id},is_main}
+            for (const image of ithColorImages) {
+                let cloudinaryResponse = await uploadOnCloudinary(image.path)
+                temp.push({
+                    image: {
+                        url: cloudinaryResponse.url,
+                        public_id: cloudinaryResponse.public_id
+                    },
+                    is_main: image.is_main
+                })
+            }
+
+            console.log(temp);
+
+            newColorsImages[index] = temp
+        }
+    }
+    // {0:[{image:{},is_main}],1:[]}
+
+    colors = colors.map((color, index) => (
+        {
+            color,
+            images: newColorsImages[index]
+        }
+    ))
+
+    // [{color,images}]
+
+    keyHighlights = JSON.parse(keyHighlights)
+    sizes = JSON.parse(sizes)
+    stocks = JSON.parse(stocks)
+    isReturnable = Boolean(isReturnable)
+
     let owner = req.user.id
 
     console.log(owner);
+    console.log(sizes);
+    console.log(stocks);
+    console.log(keyHighlights);
 
     const product = await productModel.create({
         product_name,
@@ -96,7 +129,7 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         isReturnable, //can be a string
         returnPolicy,
         totalStocks,
-        thumbnail: newThumbnail._id,
+        thumbnail,
         discount,
         description,
         category,
@@ -105,37 +138,8 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         owner,
         details,
         stocks,
+        colors
     })
-
-    let newColors = []
-    // take the color and its images
-    for (const { color, images } of colors) {
-        let newImages = []
-        // take the image and is_main boolean
-        for (const { image, is_main } of images) {
-            // take the image ,upload on cloudinary , create a new imagedoc and append it in newImages
-            let cloudinaryResponse = await uploadOnCloudinary(image)
-            // let newImage = await imageModel.create({
-            //     url: cloudinaryResponse.url,
-            //     public_id: cloudinaryResponse.public_id
-            // })
-
-            newImages.push({
-                image: {
-                    url: cloudinaryResponse.url,
-
-                },
-                is_main
-            })
-        }
-
-        newColors.push({ color, images: newImages })
-    }
-
-    product.colors = newColors
-
-    // finally save the product
-    await product.save()
 
     res.status(200).json({
         success: true,
@@ -148,13 +152,11 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
 // this function is responsible for pagination,sorting,filtering 
 const fetchProducts = catchAsyncError(async (req, res, next) => {
 
-    // { page: '1', limit: '10', category: 'price,rating' }
-
     // const products = await productModel.find({}).limit(limit).skip((page - 1) * limit)
 
-    const { page = 1, limit = 10, category, min_discount, owner, min_price, max_price, rating, sort_by, order = 'asc' } = req.query;
+    const { page = 1, limit = 10, category, min_discount, owner, min_price, max_price, rating, sort } = req.query;
 
-    console.log(req.query);
+    console.log('query ', req.query);
 
     const pipeline = [];
 
@@ -163,6 +165,8 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 
     // if category is given for filtering then filter by category
     if (category) {
+        // { category: 'sarees,kurti' }
+        // $in will get an array containing string separated by ,
         matchStage.category = { $in: category.split(',') };
     }
 
@@ -185,27 +189,42 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
         matchStage.rating = { $gte: parseInt(rating) };
     }
 
-    // so filter all the documents that matches the given criteria
-    // pipeline.push({ $match: matchStage });
+    // filter out the documents having no stocks
+    matchStage.totalStocks = { $gt: 0 }
 
-    // Facet stage for pagination and filtered total count
+    // the match stage is looking like this
+    // {
+    //     category: { $in: ['sarees', 'kurti'] },
+    //     price: { $gte: 50, $lte: 200 },
+    //     discount: { $gte: 10 },
+    //     owner: mongoose.Types.ObjectId('60d0fe4f5311236168a109ca'),
+    //     rating: { $gte: 4 },
+    //     totalStocks: { $gt: 0 }
+    //   }      
+
+    const sortParams = {}
+    if (sort) {
+        for (const sortParam in sort) {
+            if (Object.hasOwnProperty.call(sort, sortParam)) {
+                const order = parseInt(sort[sortParam]);
+                sortParams[sortParam] = order
+            }
+        }
+        console.log(sortParams);
+        // pipeline.push({ $sort: sortParams });
+    }
+
     pipeline.push({
         // facet runs the two pipelines parellely data and filteredTotal
         $facet: {
             data: [
+                // takes the documents who match this criteria
                 { $match: matchStage },
+                { $sort: sortParams },
                 // will skip previous products --> for 11 to 20 , skip 1 to 10
                 { $skip: (parseInt(page) - 1) * parseInt(limit) },
                 // only take 10 products
                 { $limit: parseInt(limit) },
-                {
-                    $lookup: {
-                        from: 'images',
-                        localField: 'thumbnail',
-                        foreignField: '_id',
-                        as: 'thumbnail'
-                    }
-                },
                 {
                     $lookup: {
                         from: 'users',
@@ -213,9 +232,6 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
                         foreignField: '_id',
                         as: 'owner'
                     }
-                },
-                {
-                    $unwind: '$thumbnail'
                 },
                 {
                     $unwind: '$owner'
@@ -235,34 +251,41 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
                     }
                 }
             ],
-            filteredTotal: [
-                { $match: matchStage },
-                // the result on counting the documents will be an object having key count and value is the result 
-                { $count: 'count' }
+            metadata: [
+                { $count: 'totalItems' }
             ],
-            total: [
+            overallTotal: [
                 { $count: 'count' }
             ]
         }
     });
 
-    // Sort stage
-    if (sort_by && order) {
-        // when order is not given that descending
-        pipeline.push({ $sort: { [sort_by]: order === 'asc' ? 1 : -1 } });
-    }
+    // sort[rating]=desc&&sort[price]=desc
+    // sort: { rating: 'desc', price: 'desc' } 
 
+
+    // {
+    //     rating: -1,
+    //     price: 1
+    //   }
+
+
+    // pipeline.push({
+    //     $sort: {  price: -1 }
+    // })
 
     // Execute the aggregation pipeline
     const result = await productModel.aggregate(pipeline)
 
     // get all the products
     const products = result[0].data;
-    const filteredTotal = result[0].filteredTotal.length ? result[0].filteredTotal[0].count : 0;
-    const overallTotal = result[0].total.length ? result[0].total[0].count : 0;
+    const filteredTotal = result[0].metadata.length ? result[0].metadata[0].totalItems : 0;
+    const overallTotal = result[0].overallTotal.length ? result[0].overallTotal[0].count : 0;
 
     // Get approximate total count using $collStats
     // const overallTotal = await productModel.countDocuments()
+
+    console.log(result);
 
     res.json({
         products,
@@ -270,13 +293,12 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
         overallTotal,
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: Math.ceil(filteredTotal / limit)
+        totalPages: Math.ceil(filteredTotal / limit),
+        metaData: result[0].metadata
     });
 })
 
 const fetchProductDetails = catchAsyncError(async (req, res, next) => {
-
-    // TODO: consider related products
 
     // take the product id from params
     const { id } = req.params
@@ -286,14 +308,6 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
             {
                 $match: {
                     _id: mongoose.Types.ObjectId.createFromHexString(id)
-                }
-            },
-            {
-                $lookup: {
-                    from: "images",
-                    localField: "colors.images.image",
-                    foreignField: "_id",
-                    as: "imageDetails"
                 }
             },
             {
@@ -321,57 +335,49 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
                 }
             },
             {
-                $lookup: {
-                    from: 'images',
-                    localField: "reviewers.avatar",
-                    foreignField: "_id",
-                    as: "reviewersImages",
-                }
-            },
-            {
                 $addFields: {
-                    colors: {
-                        $map: {
-                            input: "$colors",
-                            as: "color",
-                            in: {
-                                color: "$$color.color",
-                                images: {
-                                    $map: {
-                                        input: "$$color.images",
-                                        as: "imageObj",
-                                        in: {
-                                            image: {
-                                                // taking 0th element from the returned array
-                                                $arrayElemAt: [
-                                                    {
-                                                        // finding the populated image which have the given id
-                                                        $map: {
-                                                            input: "$imageDetails",
-                                                            as: "imageDetail",
-                                                            in: {
-                                                                $cond: {
-                                                                    if: { eq: ["$$imageDetail._id", "$$imageObj.image"] },
-                                                                    then: {
-                                                                        _id: "$$imageDetail._id",
-                                                                        url: "$$imageDetail.url"
-                                                                    },
-                                                                    else: null
-                                                                }
-                                                            },
-                                                        }
-                                                    }, {
-                                                        $indexOfArray: ["$imageDetails._id", "$$imageObj.image"]
-                                                    }
-                                                ]
-                                            },
-                                            is_main: "$$imageObj.is_main"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
+                    // colors: {
+                    //     $map: {
+                    //         input: "$colors",
+                    //         as: "color",
+                    //         in: {
+                    //             color: "$$color.color",
+                    //             images: {
+                    //                 $map: {
+                    //                     input: "$$color.images",
+                    //                     as: "imageObj",
+                    //                     in: {
+                    //                         image: {
+                    //                             // taking 0th element from the returned array
+                    //                             $arrayElemAt: [
+                    //                                 {
+                    //                                     // finding the populated image which have the given id
+                    //                                     $map: {
+                    //                                         input: "$imageDetails",
+                    //                                         as: "imageDetail",
+                    //                                         in: {
+                    //                                             $cond: {
+                    //                                                 if: { eq: ["$$imageDetail._id", "$$imageObj.image"] },
+                    //                                                 then: {
+                    //                                                     _id: "$$imageDetail._id",
+                    //                                                     url: "$$imageDetail.url"
+                    //                                                 },
+                    //                                                 else: null
+                    //                                             }
+                    //                                         },
+                    //                                     }
+                    //                                 }, {
+                    //                                     $indexOfArray: ["$imageDetails._id", "$$imageObj.image"]
+                    //                                 }
+                    //                             ]
+                    //                         },
+                    //                         is_main: "$$imageObj.is_main"
+                    //                     }
+                    //                 }
+                    //             }
+                    //         }
+                    //     }
+                    // },
                     reviews: {
                         $map: {
                             input: "$productReviews",
@@ -388,17 +394,7 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
                                                         if: { $eq: ["$$reviewer._id", "$$review.userId"] },
                                                         then: {
                                                             fullname: "$$reviewer.fullname",
-                                                            avatar: {
-                                                                $arrayElemAt: [
-                                                                    {
-                                                                        $filter: {
-                                                                            input: "$reviewersImages",
-                                                                            as: "reviewerImage",
-                                                                            cond: { $eq: ["reviewer.avatar", "reviewerImage._id"] }
-                                                                        }
-                                                                    }
-                                                                    , 0]
-                                                            },
+                                                            avatar: "$$reviewer.avatar.url"
                                                         },
                                                         else: null
                                                     }
@@ -592,10 +588,10 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
         }
     }
 
-    let deletedProduct = await findOneAndDelete({_id:productId})
+    let deletedProduct = await findOneAndDelete({ _id: productId })
 
     console.log('finally product deleted');
-   
+
     res.status(200).json({
         success: true,
         message: 'product deleted successfully'
