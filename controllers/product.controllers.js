@@ -440,6 +440,8 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
         ]
     );
 
+    console.log('product ', product);
+
     res.status(200).json({
         success: true,
         product: product[0]
@@ -467,6 +469,12 @@ const editProduct = catchAsyncError(async (req, res, next) => {
         totalStocks,
     } = req.body
 
+    sizes = JSON.parse(sizes)
+    keyHighlights = JSON.parse(keyHighlights)
+    oldColors = JSON.parse(oldColors)
+    newColors = JSON.parse(newColors)
+    stocks = JSON.parse(stocks)
+
     // take all the files of new colors
     // take all the files which are to be inserted
     // completely remove all images of a color if it is deleted
@@ -490,16 +498,18 @@ const editProduct = catchAsyncError(async (req, res, next) => {
 
         let index = ''
 
+        console.log(match);
+
         if (match)
             index = parseInt(match[1])
 
         // when index not found new thumbnail is provided
-        if (!index) {
+        if (!index && fieldname.includes('newThumbnail')) {
             newThumbnail = {
                 url: cloudinaryResponse.url,
                 public_id: cloudinaryResponse.public_id
             }
-            toBeDeleted(oldProduct.thumbnail.public_id)
+            toBeDeleted.push(oldProduct.thumbnail.public_id)
         }
         // when new colors are available
         else if (fieldname.includes('newColors')) {
@@ -594,7 +604,12 @@ const editProduct = catchAsyncError(async (req, res, next) => {
     // handled removed colors
     // handled newThumbnail
 
+    console.log('old colors ', oldColors);
+    console.log('new colors ', newColors);
+
     const newUpdatedColors = [...oldColors, ...newColors]
+
+    console.log('new updated colors ', newUpdatedColors);
 
     let newProduct = {
         product_name,
@@ -612,22 +627,28 @@ const editProduct = catchAsyncError(async (req, res, next) => {
         colors: newUpdatedColors
     }
 
+    console.log('new product ', newProduct);
+
     // when theres a new thumbnail then take it
     if (newThumbnail)
         newProduct.thumbnail = newThumbnail
 
-    let updatedProduct = await productModel.findOneAndUpdate({
-
-    })
+    let updatedProduct = await productModel.findByIdAndUpdate(
+        productId,
+        // only change the given fields
+        { $set: newProduct },
+        { new: true }
+    )
 
     // finally deleting the given images
     for (const public_id of toBeDeleted) {
-        await deleteFromCloudinary(public_id)
+        let deleteResponse = await deleteFromCloudinary(public_id)
+        console.log('delete response ', deleteResponse);
     }
 
     res.status(200).json({
-        success:true,
-        message:"product updated successfully"
+        success: true,
+        message: "product updated successfully"
     })
 }
 )
