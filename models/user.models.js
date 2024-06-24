@@ -4,10 +4,22 @@ import jwt from 'jsonwebtoken'
 import { validate } from "uuid";
 
 const addressSchema = new mongoose.Schema({
-    state: String,
-    city: String,
-    pincode: Number,
-    house_no: String,
+    state: {
+        type: String,
+        required: true
+    },
+    city: {
+        type: String,
+        required: true
+    },
+    pincode: {
+        type: String,
+        required: true
+    },
+    house_no: {
+        type: String,
+        required: true
+    },
 })
 
 const userSchema = new mongoose.Schema({
@@ -26,7 +38,7 @@ const userSchema = new mongoose.Schema({
     phoneNo: {
         type: String,
         required: true,
-        trim:true
+        trim: true
     },
     avatar: {
         url: {

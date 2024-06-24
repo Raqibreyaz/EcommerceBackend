@@ -1,5 +1,5 @@
 import express from 'express'
-import { fetchUser, loginUser, registerUser, logoutUser } from '../controllers/user.controllers.js'
+import { fetchUser, loginUser, registerUser, logoutUser, editUserProfile, changeUserAvatar, addNewAddress } from '../controllers/user.controllers.js'
 import { verifyAdmin, verifyCustomer } from '../middlewares/verifyUser.js'
 import orderRouter from '../routes/orders.routes.js'
 import wishlistRouter from '../routes/wishlist.routes.js'
@@ -21,10 +21,23 @@ router.route('/addnew')
 router.route('/login')
     .post(loginUser)
 
+    
+
+router.use(verifyCustomer)
+
 router.route('/fetch-user')
-    .get(verifyCustomer, fetchUser)
+    .get(fetchUser)
 
 router.route('/logout')
-    .get(verifyCustomer, logoutUser)
+    .get(logoutUser)
+
+router.route('/edit-profile')
+    .put(editUserProfile)
+
+router.route('/edit-profile/avatar')
+    .patch(upload.single('avatar'), changeUserAvatar)
+
+router.route('/edit-profile/address')
+    .patch(addNewAddress)
 
 export default router

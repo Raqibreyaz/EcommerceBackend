@@ -3,8 +3,7 @@ import { catchAsyncError } from '../utils/catchAsyncError.js'
 import userModel from '../models/user.models.js'
 import { cartModel } from '../models/CartAndOrder.models.js'
 import { assignJwtToken } from '../utils/assignJwtToken.js'
-import productModel from '../models/product.models.js'
-import { uploadOnCloudinary } from '../utils/cloudinary.js'
+import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js'
 
 const registerUser = catchAsyncError(async (req, res, next) => {
 
@@ -69,6 +68,64 @@ const loginUser = catchAsyncError(async (req, res, next) => {
 }
 )
 
+// except new address and avatar
+const editUserProfile = catchAsyncError(async (req, res, next) => {
+
+    const userId = req.user.id
+    const { addresses, fullname, email, phoneNo, oldPassword, newPassword } = req.body
+
+    const user = await userModel.findById(userId)
+
+    if (!await user.comparePassword(oldPassword)) {
+        throw new ApiError(400, "password not valid")
+    }
+
+    if (!fullname || !addresses || !email || !phoneNo)
+        throw new ApiError(400, "provide all necessary fields")
+
+    const toUpdate = { fullname, email, phoneNo, addresses }
+    if (newPassword)
+        toUpdate.password = newPassword
+
+    await userModel.findByIdAndUpdate(userId, {
+        $set: toUpdate
+    })
+
+    res.status(200).json({
+        success: true,
+        message: 'user profile updated successfully'
+    })
+}
+)
+
+// only for avatar
+const changeUserAvatar = catchAsyncError(async (req, res, next) => {
+
+    if (!req.files || req.files.avatar) {
+        throw new ApiError(400, "provide an avatar")
+    }
+    const cloudinaryResponse = await uploadOnCloudinary(req.files.avatar.path)
+
+    const user = await userModel.findById(req.user.id)
+
+    await deleteFromCloudinary(user.avatar.public_id)
+
+    user.avatar = {
+        url: cloudinaryResponse.url,
+        public_id: cloudinaryResponse.public_id
+    }
+
+    await user.save()
+
+    console.log(user);
+
+    res.status(200).json({
+        success: true,
+        message: "user avatar updated successfully"
+    })
+}
+)
+
 const fetchUser = catchAsyncError(async (req, res, next) => {
     const userId = req.user.id
     const user = await userModel.findById(userId).select("-password")
@@ -80,6 +137,26 @@ const fetchUser = catchAsyncError(async (req, res, next) => {
         success: true,
         message: '',
         user
+    })
+}
+)
+
+// adding a new address
+const addNewAddress = catchAsyncError(async (req, res, next) => {
+
+    const { address } = req.body
+
+    const userId = req.user.id
+
+    const updatedUser = await userModel.findByIdAndUpdate(userId, {
+        $set: { address }
+    }, { new: true })
+
+    console.log(updatedUser);
+
+    res.status(200).json({
+        success: true,
+        message: "user address saved successfully"
     })
 }
 )
@@ -99,5 +176,8 @@ export {
     registerUser,
     loginUser,
     fetchUser,
-    logoutUser
+    logoutUser,
+    editUserProfile,
+    changeUserAvatar,
+    addNewAddress
 }
