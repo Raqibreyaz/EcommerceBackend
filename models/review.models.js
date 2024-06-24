@@ -6,25 +6,30 @@ const reviewSchema = new mongoose.Schema({
     productId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'product',
-        index: true
+        index: true,
+        required: true
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'user'
+        ref: 'user',
+        required: true
     },
     oneWord: {
         type: String,
-        required: true
+        required: true,
+        maxLength: [10, "one word contains at most 10 characters"],
+        trim:true
     },
     review: {
         type: String,
         required: true,
-        minlength: [10, "review must be at least of 10 characters"]
+        minlength: [15, "review must be at least of 10 characters"]
     },
     rating: {
         type: Number,
-        required: true
+        required: true,
+        required:true
     }
-},{timestamps:true})
+}, { timestamps: true })
 
 export default mongoose.model('review', reviewSchema)

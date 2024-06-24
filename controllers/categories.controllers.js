@@ -34,7 +34,7 @@ const fetchCategories = catchAsyncError(async (req, res, next) => {
 )
 
 const editCategory = catchAsyncError(async (req, res, next) => {
-
+    
 }
 )
 

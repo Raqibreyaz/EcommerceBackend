@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError";
 import { catchAsyncError } from "../utils/catchAsyncError";
 import mongoose from "mongoose";
 
+// create an order
 const createOrder = catchAsyncError(async (req, res, next) => {
     //   1. take details from the cart and then clean the cart
     //   2.  take the details via form like cart id products with names, price , discount , quantity , size , color , image
@@ -28,7 +29,7 @@ const createOrder = catchAsyncError(async (req, res, next) => {
     })
 
     await cartModel.findByIdAndUpdate(cartId, {
-        products: []
+        $set: { products: [] }
     })
 
     res.status(200).json({
@@ -60,6 +61,63 @@ const updateOrder = catchAsyncError(async (req, res, next) => {
     res.status(200).json({
         success: true,
         message: "order updated successfully"
+    })
+}
+)
+
+const getMyOrders = catchAsyncError(async (req, res, next) => {
+    //   id will be provided to get the orders  of the customer
+    const userId = req.user.id
+
+    const { page = 1, limit = 10 } = req.query
+
+    const result = await orderModel.aggregate([
+        {
+            $match: {
+                userId
+            },
+        },
+        {
+            $sort: {
+                updatedAt: -1
+            }
+        },
+        {
+            $skip: (page - 1) * limit
+        },
+        {
+            $limit: limit
+        }
+    ])
+
+
+
+    res.status(200).json({
+        success: true,
+        message: "orders fetched successfully",
+        orders: result
+    })
+
+}
+)
+
+const getAllOrders = catchAsyncError(async (req, res, next) => {
+
+    const { page = 1, limit = 10 } = req.query
+
+    const result = await orderModel.aggregate([
+        { $match: {} },
+        { $sort: { updatedAt: -1 } },
+        { $skip: (page - 1) * limit },
+        { $limit: limit }
+    ])
+
+    console.log(result);
+
+    res.status(200).json({
+        success: true,
+        message: "orders fetched successfully",
+        orders: result
     })
 }
 )
@@ -127,5 +185,7 @@ const changeReturnStatus = catchAsyncError(async (req, res, next) => {
 export {
     createOrder,
     updateOrder,
-    changeReturnStatus
+    changeReturnStatus,
+    getAllOrders,
+    getMyOrders
 }

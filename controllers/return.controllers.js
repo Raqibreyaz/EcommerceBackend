@@ -79,6 +79,19 @@ const updateReturnRequest = catchAsyncError(async (req, res, next) => {
 
 const fetchReturnRequests = catchAsyncError(async (req, res, next) => {
 
+    const { page = 1, limit = 10 } = req.query
+
+    const returnRequests = await returnModel.aggregate([
+        { $match: {} },
+        { $sort: { updatedAt: -1 } },
+        { $skip: (page - 1) * limit },
+        { $limit: limit }
+    ])
+
+    res.status(200).json({
+        success: true,
+        message: "return requests fetched successfully"
+    })
 }
 )
 

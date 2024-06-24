@@ -25,7 +25,8 @@ const userSchema = new mongoose.Schema({
     },
     phoneNo: {
         type: String,
-        required: true
+        required: true,
+        trim:true
     },
     avatar: {
         url: {
