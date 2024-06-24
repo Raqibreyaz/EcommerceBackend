@@ -1,6 +1,8 @@
 import mongoose from 'mongoose'
+import { validate } from 'uuid'
 
 const returnSchema = new mongoose.Schema({
+    // product id is the id of the product in the order
     productId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'product',
@@ -11,7 +13,21 @@ const returnSchema = new mongoose.Schema({
         ref: 'user',
         required: true
     },
-    images: [String],
+    orderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'order',
+        required: true
+    },
+    images: {
+        type: [String],
+        required: true,
+        validate: {
+            validator: (images) => {
+                return images.length > 3 && images.length <= 5
+            },
+            message: "only 3 to 5 images are required"
+        }
+    },
     reason: {
         type: String,
         required: true,
@@ -26,6 +42,11 @@ const returnSchema = new mongoose.Schema({
         city: String,
         pincode: Number,
         house_no: String,
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
     }
 }, { timestamps: true })
 

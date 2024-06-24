@@ -11,7 +11,7 @@ const addToCart = catchAsyncError(async (req, res, next) => {
     const { id: userId } = req.user
     let { productId, color, size, quantity } = req.body
 
-    console.log('reached here to add to cart');
+    console.log('reached here to add to cart', req.body);
 
     quantity = parseInt(quantity)
 
@@ -103,6 +103,7 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
     });
 
     let toSave = false;
+    // will contain products which are to be removed from the cart
     let discardedProductsIndex = {};
     let cartProducts = [];
 
@@ -115,6 +116,7 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
             return;
         }
 
+        // when the size of a product not exists then remove from cart
         const sizeIndex = product.sizes.indexOf(cartProduct.size);
         if (sizeIndex === -1) {
             toSave = true;
@@ -122,6 +124,7 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
             return;
         }
 
+        // when the chosen color not exist then remove from cart
         const colorObj = product.colors.find(colorObj => colorObj.color === cartProduct.color);
         if (!colorObj) {
             toSave = true;
@@ -129,10 +132,10 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
             return;
         }
 
+        // when stocks are not available then hide the product
         const stockObj = product.stocks.find(stockObj => (
             stockObj.color === cartProduct.color && stockObj.size === cartProduct.size
         ));
-
         if (!stockObj || stockObj.stock < cartProduct.quantity) {
             return;
         }

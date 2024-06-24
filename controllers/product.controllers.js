@@ -282,11 +282,6 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     const filteredTotal = result[0].metadata.length ? result[0].metadata[0].totalItems : 0;
     const overallTotal = result[0].overallTotal.length ? result[0].overallTotal[0].count : 0;
 
-    // Get approximate total count using $collStats
-    // const overallTotal = await productModel.countDocuments()
-
-    console.log(result);
-
     res.json({
         products,
         filteredTotal,
