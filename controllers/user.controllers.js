@@ -148,11 +148,20 @@ const addNewAddress = catchAsyncError(async (req, res, next) => {
 
     const userId = req.user.id
 
-    const updatedUser = await userModel.findByIdAndUpdate(userId, {
-        $set: { address }
-    }, { new: true })
+    const user = await userModel.findById(userId)
 
-    console.log(updatedUser);
+    let checkUnique = user.addresses.filter((addressObj) => (
+        addressObj.house_no === address.house_no
+        && addressObj.state === address.state
+        && addressObj.city === address.city
+        && addressObj.pincode === address.pincode
+    ))
+    if (checkUnique.length)
+        throw new ApiError(400, "address already exists")
+
+    await userModel.findByIdAndUpdate(userId, {
+        $push: { addresses: address }
+    }, { new: true })
 
     res.status(200).json({
         success: true,

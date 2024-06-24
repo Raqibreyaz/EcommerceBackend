@@ -18,7 +18,7 @@ const addressSchema = new mongoose.Schema({
     },
     house_no: {
         type: String,
-        required: true
+        required: true,
     },
 })
 
