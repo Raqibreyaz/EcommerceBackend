@@ -11,11 +11,15 @@ const addToCart = catchAsyncError(async (req, res, next) => {
     const { id: userId } = req.user
     let { productId, color, size, quantity } = req.body
 
-    console.log('reached here to add to cart', req.body);
+    if (!productId || !color || !size || !quantity)
+        throw new ApiError(400,"provide full details")
 
-    quantity = parseInt(quantity)
+        quantity = parseInt(quantity)
 
     const product = await productModel.findById(productId)
+
+    if(!product)
+        throw new ApiError(404,"product not found!!")
 
     let availableStocks = 0
 

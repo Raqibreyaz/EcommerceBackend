@@ -1,7 +1,7 @@
 import express from 'express'
 import { fetchUser, loginUser, registerUser, logoutUser, editUserProfile, changeUserAvatar, addNewAddress } from '../controllers/user.controllers.js'
 import { verifyAdmin, verifyCustomer } from '../middlewares/verifyUser.js'
-import orderRouter from '../routes/orders.routes.js'
+import orderRouter from '../routes/order.routes.js'
 import wishlistRouter from '../routes/wishlist.routes.js'
 import cartRouter from '../routes/cart.routes.js'
 import { upload } from '../middlewares/upload.middlewares.js'

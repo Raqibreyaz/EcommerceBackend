@@ -1,15 +1,16 @@
-import { cartModel, orderModel } from "../models/CartAndOrder.models";
-import { ApiError } from "../utils/ApiError";
-import { catchAsyncError } from "../utils/catchAsyncError";
+import { cartModel, orderModel } from "../models/CartAndOrder.models.js";
+import { ApiError } from "../utils/ApiError.js";
+import { catchAsyncError } from "../utils/catchAsyncError.js";
 import mongoose from "mongoose";
 
-// create an order
+// create an order 
 const createOrder = catchAsyncError(async (req, res, next) => {
     //   1. take details from the cart and then clean the cart
     //   2.  take the details via form like cart id products with names, price , discount , quantity , size , color , image
 
+    let userId = req.user.id
+
     let {
-        cartId,
         products,
         totalPrice,
         totalDiscount,
@@ -17,9 +18,12 @@ const createOrder = catchAsyncError(async (req, res, next) => {
         deliveryAddress
     } = req.body
 
-    // products-->[{product,quantity,size,color,price,discount,image}]
+    if (!products || !products.length || !totalPrice || !totalDiscount || !totalAmount || !deliveryAddress)
+        throw new ApiError(400, "please provide complete details of the order")
 
-    let newOrder = orderModel.create({
+    // products-->[{product,product_name,quantity,size,color,price,discount,image}]
+
+    let newOrder = await orderModel.create({
         userId: req.user.id,
         products,
         totalPrice,
@@ -28,7 +32,7 @@ const createOrder = catchAsyncError(async (req, res, next) => {
         deliveryAddress
     })
 
-    await cartModel.findByIdAndUpdate(cartId, {
+    await cartModel.findOneAndUpdate({ userId }, {
         $set: { products: [] }
     })
 
@@ -65,7 +69,7 @@ const updateOrder = catchAsyncError(async (req, res, next) => {
 }
 )
 
-const getMyOrders = catchAsyncError(async (req, res, next) => {
+const fetchOrders = catchAsyncError(async (req, res, next) => {
     //   id will be provided to get the orders  of the customer
     const userId = req.user.id
 
@@ -74,7 +78,7 @@ const getMyOrders = catchAsyncError(async (req, res, next) => {
     const result = await orderModel.aggregate([
         {
             $match: {
-                userId
+                userId: mongoose.Types.ObjectId.createFromHexString(userId)
             },
         },
         {
@@ -87,10 +91,19 @@ const getMyOrders = catchAsyncError(async (req, res, next) => {
         },
         {
             $limit: limit
+        },
+        {
+            $project: {
+                totalAmount: 1,
+                createdAt: 1,
+                deliveryStatus: 1,
+                deliveredAt: 1,
+                "products.image": 1,
+                "products.returnStatus": 1,
+                "products.product": 1
+            }
         }
     ])
-
-
 
     res.status(200).json({
         success: true,
@@ -101,7 +114,13 @@ const getMyOrders = catchAsyncError(async (req, res, next) => {
 }
 )
 
-const getAllOrders = catchAsyncError(async (req, res, next) => {
+const fetchOrderDetails = catchAsyncError(async (req, res, next) => {
+
+}
+)
+
+
+const fetchAllOrders = catchAsyncError(async (req, res, next) => {
 
     const { page = 1, limit = 10 } = req.query
 
@@ -186,6 +205,6 @@ export {
     createOrder,
     updateOrder,
     changeReturnStatus,
-    getAllOrders,
-    getMyOrders
+    fetchAllOrders,
+    fetchOrders
 }
