@@ -1,5 +1,5 @@
 import express from "express"
-import { fetchCategories,addNewCategory, editCategory, deleteCategory } from "../controllers/categories.controllers.js"
+import { fetchCategories,addNewCategory, editCategory, deleteCategory } from "../controllers/category.controllers.js"
 import { verifyAdmin } from "../middlewares/verifyUser.js"
 
 const router = express.Router()

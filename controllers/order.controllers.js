@@ -116,6 +116,17 @@ const fetchOrders = catchAsyncError(async (req, res, next) => {
 
 const fetchOrderDetails = catchAsyncError(async (req, res, next) => {
 
+    const orderId = req.params.id
+
+    console.log('reached to get details');
+
+    const orderDetails = await orderModel.findById(orderId)
+
+    res.status(200).json({
+        success: true,
+        message: "order details fetched successfully",
+        orderDetails
+    })
 }
 )
 
@@ -206,5 +217,6 @@ export {
     updateOrder,
     changeReturnStatus,
     fetchAllOrders,
-    fetchOrders
+    fetchOrders,
+    fetchOrderDetails
 }
