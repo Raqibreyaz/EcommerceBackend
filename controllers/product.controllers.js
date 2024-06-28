@@ -86,13 +86,22 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
             // {image:{url,public_id},is_main}
             for (const image of ithColorImages) {
                 let cloudinaryResponse = await uploadOnCloudinary(image.path)
-                temp.push({
+
+                let imageObj = {
                     image: {
                         url: cloudinaryResponse.url,
                         public_id: cloudinaryResponse.public_id
                     },
                     is_main: image.is_main
-                })
+                };
+
+                // inserting main image at the 0th index to get it at O(1)
+                if (image.is_main) {
+                    temp.unshift(imageObj)
+                }
+                else {
+                    temp.push(imageObj)
+                }
             }
 
             console.log(temp);
@@ -518,7 +527,13 @@ const editProduct = catchAsyncError(async (req, res, next) => {
             }
 
             if (typeof newColors[index] === 'object') {
-                newColors[index].images.push(imageObj)
+
+                // insert main image at the 0th index for T.C. O(1)
+                if (imageObj.is_main) {
+                    newColors[index].images.unshift(imageObj)
+                }
+                else
+                    newColors[index].images.push(imageObj)
             }
             else {
                 const tempObj = {
@@ -545,13 +560,22 @@ const editProduct = catchAsyncError(async (req, res, next) => {
                 oldColors[index].mainImage = null
             }
 
-            oldColors[index].images.push({
+            let imageObj = {
                 image: {
                     url: cloudinaryResponse.url,
                     public_id: cloudinaryResponse.public_id
                 },
                 is_main: isMain
-            })
+            }
+
+            // insert main image at the 0th index for T.C. O(1)
+            if (isMain) {
+                oldColors[index].images.unshift(imageObj)
+            }
+            else {
+                oldColors[index].images.push(imageObj)
+            }
+
         }
     }
 
@@ -582,16 +606,10 @@ const editProduct = catchAsyncError(async (req, res, next) => {
         // take images which have to be deleted from that color
         toBeDeleted = [...toBeDeleted, ...removedImages]
 
-        // mainImage is required
-        if (mainImage) {
-            return {
-                color,
-                images: [...images, mainImage]
-            }
-        }
-        else null
+        // when mainImage exists it means we have to include it in images at 0 index 
+        // when no mainImage exist then it is already set , just return
+        return mainImage ? { color, images: [mainImage, ...images] } : { color, images }
     })
-        .filter((color) => color ? true : false)
 
     // handled oldColors
     // handled newColors

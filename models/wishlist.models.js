@@ -3,15 +3,29 @@ import mongoose from "mongoose";
 const wishlistSchema = new mongoose.Schema({
     products: [
         {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'product'
+            productId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'product'
+            },
+            color: {
+                type: String,
+                required: true,
+            },
+            size: {
+                type: String,
+                required: true
+            },
+            image: {
+                type: String,
+                required: true
+            },
         }
     ],
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
         index: true,
-        required:true
+        required: true
     }
 })
 

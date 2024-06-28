@@ -12,14 +12,14 @@ const addToCart = catchAsyncError(async (req, res, next) => {
     let { productId, color, size, quantity } = req.body
 
     if (!productId || !color || !size || !quantity)
-        throw new ApiError(400,"provide full details")
+        throw new ApiError(400, "provide full details")
 
-        quantity = parseInt(quantity)
+    quantity = parseInt(quantity)
 
     const product = await productModel.findById(productId)
 
-    if(!product)
-        throw new ApiError(404,"product not found!!")
+    if (!product)
+        throw new ApiError(404, "product not found!!")
 
     let availableStocks = 0
 
@@ -80,9 +80,11 @@ const addToCart = catchAsyncError(async (req, res, next) => {
 const fetchCart = catchAsyncError(async (req, res, next) => {
     const { id: userId } = req.user
 
-    const userCart = await cartModel.findOne({ userId }).lean();
+    // get the cart of the user via userId
+    const userCart = await cartModel.findOne({ userId });
 
-    if (userCart.products.length === 0) {
+    // when there are no products in the cart just return an empty array
+    if (!userCart || userCart.products.length === 0) {
         res.status(200).json({
             success: true,
             message: "cart fetched successfully",
@@ -90,30 +92,45 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
         })
     }
 
-    const productIds = userCart.products.map(cp => cp.product.toString());
 
     // lean makes the doc as plane javascript object
+
+    // get all the product ids in an array
+    const productIds = userCart.products.map(cp => cp.product.toString());
+
+    // take all the products in an array through their ids
     const products = await productModel.find({ _id: { $in: productIds } }).lean();
+
+    // will map each id with the product
     const productMap = {};
     products.forEach(product => {
         productMap[product._id.toString()] = product;
     });
 
+    // extracting all the owners ids
     const ownerIds = products.map(p => p.owner.toString());
+
+    // finding owners through ids
     const owners = await userModel.find({ _id: { $in: ownerIds } }).lean();
+
+    // mapping every owner with id
     const ownerMap = {};
     owners.forEach(owner => {
         ownerMap[owner._id.toString()] = owner;
     });
+
 
     let toSave = false;
     // will contain products which are to be removed from the cart
     let discardedProductsIndex = {};
     let cartProducts = [];
 
+
     userCart.products.forEach((cartProduct, i) => {
+        // getting the product from the mapping via  its id 
         const product = productMap[cartProduct.product.toString()];
 
+        // when the product is deleted 
         if (!product) {
             toSave = true;
             discardedProductsIndex[i] = true;
@@ -140,6 +157,7 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
         const stockObj = product.stocks.find(stockObj => (
             stockObj.color === cartProduct.color && stockObj.size === cartProduct.size
         ));
+
         if (!stockObj || stockObj.stock < cartProduct.quantity) {
             return;
         }
@@ -168,67 +186,6 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
         userCart.products = userCart.products.filter((_, index) => !discardedProductsIndex[index]);
         await userCart.save();
     }
-
-    // const userCart = await cartModel.aggregate([
-    //     // Step 1: Match the cart by userId
-    //     { $match: { userId: mongoose.Types.ObjectId.createFromHexString(userId) } },
-    //     // Step 2: Unwind the products array
-    //     { $unwind: "$products" },
-    //     // Step 3: Lookup product details from the product collection
-    //     {
-    //         $lookup: {
-    //             from: "products",
-    //             localField: "products.product",
-    //             foreignField: "_id",
-    //             as: "productDetails"
-    //         }
-    //     },
-    //     // Step 4: Unwind the productDetails array
-    //     { $unwind: "$productDetails" },
-    //     // Step 5: Add product details to the products field
-    //     {
-    //         $addFields: {
-    //             "products.product_name": "$productDetails.product_name",
-    //             "products.price": "$productDetails.price",
-    //             "products.discount": "$productDetails.discount",
-    //             "products.category": "$productDetails.category",
-    //             "products.owner": "$productDetails.owner",
-    //         }
-    //     },
-    //     // Step 6: Lookup owner details from the user collection
-    //     {
-    //         $lookup: {
-    //             from: "users",
-    //             localField: "products.owner",
-    //             foreignField: "_id",
-    //             as: "ownerDetails"
-    //         }
-    //     },
-    //     // Step 7: Unwind the ownerDetails array
-    //     { $unwind: "$ownerDetails" },
-    //     // Step 8: Add owner name to the products field
-    //     {
-    //         $addFields: {
-    //             "products.owner.name": "$ownerDetails.fullname"
-    //         }
-    //     },
-    //     // Step 9: Group back to array format
-    //     {
-    //         $group: {
-    //             _id: "$_id",
-    //             userId: { $first: "$userId" },
-    //             products: { $push: "$products" }
-    //         }
-    //     },
-    //     // Step 10: Project the final format
-    //     {
-    //         $project: {
-    //             _id: 1,
-    //             userId: 1,
-    //             products: 1
-    //         }
-    //     }
-    // ]);
 
     res.status(200).json({
         success: true,
