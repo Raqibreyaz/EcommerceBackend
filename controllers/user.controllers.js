@@ -4,8 +4,12 @@ import userModel from '../models/user.models.js'
 import { cartModel } from '../models/CartAndOrder.models.js'
 import { assignJwtToken } from '../utils/assignJwtToken.js'
 import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js'
+import { checker, checkArrays } from '../utils/objectAndArrayChecker.js'
 
 const registerUser = catchAsyncError(async (req, res, next) => {
+
+    if (!checker({ ...req.body, avatar: req.file }, { role }))
+        throw new ApiError(400, "please provide full details")
 
     let { fullname, email, password, phoneNo, address, role = 'customer' } = req.body
 
@@ -13,8 +17,11 @@ const registerUser = catchAsyncError(async (req, res, next) => {
 
     address = JSON.parse(address)
 
+    if (checker(address))
+        throw new ApiError(400, "address is required!!")
+
     if (await userModel.findOne({ email }))
-        throw new ApiError(400, "user already exists")
+        throw new ApiError(400, "user with this email already exists")
 
     const cloudinaryResponse = await uploadOnCloudinary(avatar.path)
 

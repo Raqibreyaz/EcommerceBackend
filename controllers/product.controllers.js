@@ -4,6 +4,7 @@ import { ApiError } from '../utils/ApiError.js'
 import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js'
 import categoryModel from '../models/category.models.js'
 import reviewModel from '../models/review.models.js'
+import { checkArrays, checker } from '../utils/objectAndArrayChecker.js'
 import mongoose from 'mongoose'
 
 // this function just adds a new product 
@@ -26,15 +27,22 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         stocks,
     } = req.body;
 
+    if (checker(req.body, { isReturnable, discount }))
+        throw new ApiError(400, "provide full info of the product")
+
     let productCategory = await categoryModel.findOne({ name: category.toLowerCase() })
     if (!productCategory) {
         throw new ApiError(404, "category does not exist")
     }
 
-    if (req.files.length === 0)
-        throw new ApiError(400, "Images are Required")
-
     colors = JSON.parse(colors)
+    keyHighlights = JSON.parse(keyHighlights)
+    sizes = JSON.parse(sizes)
+    stocks = JSON.parse(stocks)
+
+    let arrayCheck = checkArrays({ colors, keyHighlights, sizes, stocks, images: req.files })
+    if (arrayCheck)
+        throw new ApiError(400, `${arrayCheck} are required!!`)
 
     let colorsImages = {}
     let thumbnailPath = ''
@@ -120,9 +128,6 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
 
     // [{color,images}]
 
-    keyHighlights = JSON.parse(keyHighlights)
-    sizes = JSON.parse(sizes)
-    stocks = JSON.parse(stocks)
     isReturnable = Boolean(isReturnable)
 
     let owner = req.user.id
@@ -307,6 +312,9 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
     // take the product id from params
     const { id } = req.params
 
+    if (!checker(req.params))
+        throw new ApiError(400, "please provide an id")
+
     const product = await productModel.aggregate(
         [
             {
@@ -454,6 +462,9 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 )
 
 const editProduct = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.body, { isReturnable, discount }))
+        throw new ApiError(400, "provide necessary details to update product")
 
     let {
         product_name,

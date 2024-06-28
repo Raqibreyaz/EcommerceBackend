@@ -22,7 +22,6 @@ const addNewCategory = catchAsyncError(async (req, res, next) => {
 }
 )
 
-
 const fetchCategories = catchAsyncError(async (req, res, next) => {
     const categories = await categoryModel.find({})
     res.status(200).json({

@@ -2,6 +2,7 @@ import { cartModel, orderModel } from "../models/CartAndOrder.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { catchAsyncError } from "../utils/catchAsyncError.js";
 import mongoose from "mongoose";
+import { checker, checkArrayd, checkArrays } from '../utils/objectAndArrayChecker.js'
 
 // create an order 
 const createOrder = catchAsyncError(async (req, res, next) => {
@@ -10,6 +11,12 @@ const createOrder = catchAsyncError(async (req, res, next) => {
 
     let userId = req.user.id
 
+    if (!checker(req.body))
+        throw new ApiError(400, "please provide complete details of the order")
+
+    if (checkArrays({ products }))
+        throw new ApiError(400, "order should have at least one product")
+
     let {
         products,
         totalPrice,
@@ -17,9 +24,6 @@ const createOrder = catchAsyncError(async (req, res, next) => {
         totalAmount,
         deliveryAddress
     } = req.body
-
-    if (!products || !products.length || !totalPrice || !totalDiscount || !totalAmount || !deliveryAddress)
-        throw new ApiError(400, "please provide complete details of the order")
 
     // products-->[{product,product_name,quantity,size,color,price,discount,image}]
 
@@ -45,6 +49,9 @@ const createOrder = catchAsyncError(async (req, res, next) => {
 
 const updateOrder = catchAsyncError(async (req, res, next) => {
 
+    if (checker({ ...req.body, id: req.params.id }))
+        throw new ApiError(400, "provide at least one info of the order")
+
     const {
         deliveryStatus = '',
         deliveredAt = '',
@@ -61,6 +68,8 @@ const updateOrder = catchAsyncError(async (req, res, next) => {
     if (deliveredAt) {
         order.deliveredAt = deliveredAt
     }
+
+    order.save()
 
     res.status(200).json({
         success: true,
@@ -117,6 +126,9 @@ const fetchOrders = catchAsyncError(async (req, res, next) => {
 const fetchOrderDetails = catchAsyncError(async (req, res, next) => {
 
     const orderId = req.params.id
+
+    if (orderId)
+        throw new ApiError(400, "provide an order id to get details")
 
     console.log('reached to get details');
 

@@ -3,6 +3,7 @@ import { cartModel } from "../models/CartAndOrder.models.js";
 import mongoose from "mongoose";
 import productModel from "../models/product.models.js";
 import { ApiError } from "../utils/ApiError.js";
+import { checkArrays, checker } from '../utils/objectAndArrayChecker.js'
 import userModel from '../models/user.models.js'
 
 // responsible to add product to cart and update it quantity
@@ -11,7 +12,7 @@ const addToCart = catchAsyncError(async (req, res, next) => {
     const { id: userId } = req.user
     let { productId, color, size, quantity } = req.body
 
-    if (!productId || !color || !size || !quantity)
+    if (!checker({ ...req.body }))
         throw new ApiError(400, "provide full details")
 
     quantity = parseInt(quantity)
@@ -200,6 +201,9 @@ const deleteProductFromCart = catchAsyncError(async (req, res, next) => {
     let { id: userId } = req.user
     let { productId, color, size } = req.body
 
+    if (!checker({ ...req.body }))
+        throw new ApiError(400, "please provide full details")
+
     userId = mongoose.Types.ObjectId.createFromHexString(userId)
     productId = mongoose.Types.ObjectId.createFromHexString(productId)
 
@@ -218,8 +222,6 @@ const deleteProductFromCart = catchAsyncError(async (req, res, next) => {
         },
         // mongo db will return the updated document when new:true else return the doc before which was before the updation
         { new: true })
-
-
 
     res.status(200).json({
         success: true,

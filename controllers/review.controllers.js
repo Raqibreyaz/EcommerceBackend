@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import reviewModel from "../models/review.models.js";
 import { ApiError } from "../utils/ApiError";
 import { catchAsyncError } from "../utils/catchAsyncError.js";
@@ -6,6 +7,9 @@ const createReview = catchAsyncError(async (req, res, next) => {
     const userId = req.user.id
     const productId = req.params.id
     const { oneWord, review, rating } = req.body
+
+    if (!productId || !review || !rating || !oneWord)
+        throw new ApiError(400, "please provide full details")
 
     const newReview = reviewModel.create({
         userId,
@@ -18,12 +22,11 @@ const createReview = catchAsyncError(async (req, res, next) => {
     res.status(200).json({
         success: true,
         message: "review created successfully",
-        review: newReview
     })
 }
 )
 
-const getReviews = catchAsyncError(async (req, res, next) => {
+const fetchReviews = catchAsyncError(async (req, res, next) => {
 
     const productId = req.params.id
     const { page = 1, limit = 10 } = req.query
@@ -35,11 +38,21 @@ const getReviews = catchAsyncError(async (req, res, next) => {
                 productId,
             },
         },
+        // sorting reviews based on rating and newest first
+        {
+            $sort: { createdAt: -1, rating: -1 }
+        },
         {
             $skip: (page - 1) * limit
         },
         {
             $limit: limit
+        },
+        {
+            $project: {
+                productId: 0,
+                userId: 0
+            }
         }
     ])
 
@@ -51,17 +64,18 @@ const getReviews = catchAsyncError(async (req, res, next) => {
 
 })
 
-const updateReview = catchAsyncError(async (req, res, next) => {
+const editReview = catchAsyncError(async (req, res, next) => {
     const userId = req.user.id
     const { oneWord, review, rating } = req.body
-    const productId = req.params.id
+    const reviewId = req.params.id
 
     // find the review  in the user reviewed on that product
     const result = await reviewModel.aggregate([
         {
+            // take that particular review of that user
             $match: {
-                userId,
-                productId
+                userId: mongoose.Types.ObjectId.createFromHexString(userId),
+                _id: reviewId
             }
         },
         {
@@ -73,19 +87,19 @@ const updateReview = catchAsyncError(async (req, res, next) => {
         }
     ])
 
+    // when the review does not belongs to the user or user not have reviewed yet
     if (!result.length)
         throw new ApiError(404, "user review not found")
 
     res.status(200).json({
         success: true,
         message: "review updated successfully",
-        review: result[0]
     })
 }
 )
 
 export {
     createReview,
-    getReviews,
-    updateReview
+    fetchReviews,
+    editReview
 }
