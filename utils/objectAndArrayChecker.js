@@ -1,10 +1,11 @@
 // returns false when keys or values does not exists after excludes
 function checker(object, excludes = {}) {
 
+
     if (!Object.keys(object).length)
         return false
 
-    for (const key of object) {
+    for (const key of Object.keys(object)) {
         if (!excludes[key] && !object[key])
             return false
     }

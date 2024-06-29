@@ -84,108 +84,102 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
     // get the cart of the user via userId
     const userCart = await cartModel.findOne({ userId });
 
-    // when there are no products in the cart just return an empty array
-    if (!userCart || userCart.products.length === 0) {
-        res.status(200).json({
-            success: true,
-            message: "cart fetched successfully",
-            userCart: []
-        })
-    }
-
-
-    // lean makes the doc as plane javascript object
-
-    // get all the product ids in an array
-    const productIds = userCart.products.map(cp => cp.product.toString());
-
-    // take all the products in an array through their ids
-    const products = await productModel.find({ _id: { $in: productIds } }).lean();
-
-    // will map each id with the product
-    const productMap = {};
-    products.forEach(product => {
-        productMap[product._id.toString()] = product;
-    });
-
-    // extracting all the owners ids
-    const ownerIds = products.map(p => p.owner.toString());
-
-    // finding owners through ids
-    const owners = await userModel.find({ _id: { $in: ownerIds } }).lean();
-
-    // mapping every owner with id
-    const ownerMap = {};
-    owners.forEach(owner => {
-        ownerMap[owner._id.toString()] = owner;
-    });
-
-
-    let toSave = false;
-    // will contain products which are to be removed from the cart
-    let discardedProductsIndex = {};
     let cartProducts = [];
 
+    // the operations will be done when there is a cart and it has products
+    if (userCart && userCart.products.length > 0) {
 
-    userCart.products.forEach((cartProduct, i) => {
-        // getting the product from the mapping via  its id 
-        const product = productMap[cartProduct.product.toString()];
+        // lean makes the doc as plane javascript object
 
-        // when the product is deleted 
-        if (!product) {
-            toSave = true;
-            discardedProductsIndex[i] = true;
-            return;
-        }
+        // get all the product ids in an array
+        const productIds = userCart.products.map(cp => cp.product.toString());
 
-        // when the size of a product not exists then remove from cart
-        const sizeIndex = product.sizes.indexOf(cartProduct.size);
-        if (sizeIndex === -1) {
-            toSave = true;
-            discardedProductsIndex[i] = true;
-            return;
-        }
+        // take all the products in an array through their ids
+        const products = await productModel.find({ _id: { $in: productIds } }).lean();
 
-        // when the chosen color not exist then remove from cart
-        const colorObj = product.colors.find(colorObj => colorObj.color === cartProduct.color);
-        if (!colorObj) {
-            toSave = true;
-            discardedProductsIndex[i] = true;
-            return;
-        }
-
-        // when stocks are not available then hide the product
-        const stockObj = product.stocks.find(stockObj => (
-            stockObj.color === cartProduct.color && stockObj.size === cartProduct.size
-        ));
-
-        if (!stockObj || stockObj.stock < cartProduct.quantity) {
-            return;
-        }
-
-        const image = colorObj.images.find(image => image.is_main)?.image.url || '';
-
-        const owner = ownerMap[product.owner.toString()];
-
-        cartProducts.push({
-            product_name: product.product_name,
-            price: product.price,
-            discount: product.discount,
-            category: product.category,
-            owner: {
-                fullname: owner.fullname
-            },
-            image,
-            quantity: cartProduct.quantity,
-            product: cartProduct.product,
-            size: cartProduct.size,
-            color: cartProduct.color
+        // will map each id with the product
+        const productMap = {};
+        products.forEach(product => {
+            productMap[product._id.toString()] = product;
         });
-    });
 
-    if (toSave) {
-        userCart.products = userCart.products.filter((_, index) => !discardedProductsIndex[index]);
-        await userCart.save();
+        // extracting all the owners ids
+        const ownerIds = products.map(p => p.owner.toString());
+
+        // finding owners through ids
+        const owners = await userModel.find({ _id: { $in: ownerIds } }).lean();
+
+        // mapping every owner with id
+        const ownerMap = {};
+        owners.forEach(owner => {
+            ownerMap[owner._id.toString()] = owner;
+        });
+
+
+        let toSave = false;
+        // will contain products which are to be removed from the cart
+        let discardedProductsIndex = {};
+
+        userCart.products.forEach((cartProduct, i) => {
+            // getting the product from the mapping via  its id 
+            const product = productMap[cartProduct.product.toString()];
+
+            // when the product is deleted 
+            if (!product) {
+                toSave = true;
+                discardedProductsIndex[i] = true;
+                return;
+            }
+
+            // when the size of a product not exists then remove from cart
+            const sizeIndex = product.sizes.indexOf(cartProduct.size);
+            if (sizeIndex === -1) {
+                toSave = true;
+                discardedProductsIndex[i] = true;
+                return;
+            }
+
+            // when the chosen color not exist then remove from cart
+            const colorObj = product.colors.find(colorObj => colorObj.color === cartProduct.color);
+            if (!colorObj) {
+                toSave = true;
+                discardedProductsIndex[i] = true;
+                return;
+            }
+
+            // when stocks are not available then hide the product
+            const stockObj = product.stocks.find(stockObj => (
+                stockObj.color === cartProduct.color && stockObj.size === cartProduct.size
+            ));
+
+            if (!stockObj || stockObj.stock < cartProduct.quantity) {
+                return;
+            }
+
+            const image = colorObj.images.find(image => image.is_main)?.image.url || '';
+
+            const owner = ownerMap[product.owner.toString()];
+
+            cartProducts.push({
+                product_name: product.product_name,
+                price: product.price,
+                discount: product.discount,
+                category: product.category,
+                owner: {
+                    fullname: owner.fullname
+                },
+                image,
+                quantity: cartProduct.quantity,
+                product: cartProduct.product,
+                size: cartProduct.size,
+                color: cartProduct.color
+            });
+        });
+
+        if (toSave) {
+            userCart.products = userCart.products.filter((_, index) => !discardedProductsIndex[index]);
+            await userCart.save();
+        }
     }
 
     res.status(200).json({

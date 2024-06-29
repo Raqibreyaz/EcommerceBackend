@@ -188,6 +188,25 @@ const logoutUser = catchAsyncError(async (req, res, next) => {
 }
 )
 
+const fetchProductOwners = catchAsyncError(async (req, res, next) => {
+    const productOwners = await userModel.aggregate([
+        { $match: { role: { $in: ['admin', 'seller'] } } },
+        {
+            $project: {
+                _id: 1,
+                fullname: 1
+            }
+        }
+    ])
+
+    res.status(200).json({
+        success: true,
+        message: "product owners fetched successfully",
+        productOwners
+    })
+}
+)
+
 export {
     registerUser,
     loginUser,
@@ -195,5 +214,6 @@ export {
     logoutUser,
     editUserProfile,
     changeUserAvatar,
-    addNewAddress
+    addNewAddress,
+    fetchProductOwners
 }

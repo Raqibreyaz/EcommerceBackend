@@ -168,9 +168,7 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 
     // const products = await productModel.find({}).limit(limit).skip((page - 1) * limit)
 
-    const { page = 1, limit = 10, category, min_discount, owner, min_price, max_price, rating, sort } = req.query;
-
-    console.log('query ', req.query);
+    const { page = 1, limit = 10, category, min_discount, product_owners, min_price, max_price, rating, sort } = req.query;
 
     const pipeline = [];
 
@@ -185,8 +183,14 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     }
 
     // if price is given for filtering then filter by price
-    if (min_price && max_price) {
-        matchStage.price = { $gte: parseInt(min_price), $lte: parseInt(max_price) };
+    if (min_price) {
+        const obj = {
+            $gte: parseInt(min_price)
+        }
+        if (max_price) {
+            obj.$lte = parseInt(max_price)
+        }
+        matchStage.price = obj;
     }
 
     if (min_discount) {
@@ -194,9 +198,9 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     }
 
     // owner must be the id
-    if (owner) {
-        matchStage.owner = mongoose.Types.ObjectId.createFromHexString(owner)
-    }
+    // if (product_owners) {
+    //     matchStage.owner = mongoose.Types.ObjectId.createFromHexString(owner)
+    // }
 
     // if rating is given for filtering then filter by rating
     if (rating) {
@@ -216,25 +220,26 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     //     totalStocks: { $gt: 0 }
     //   }      
 
-    const sortParams = {}
+    pipeline.push({ $match: matchStage })
+
     if (sort) {
+        const sortParams = {}
         for (const sortParam in sort) {
             if (Object.hasOwnProperty.call(sort, sortParam)) {
                 const order = parseInt(sort[sortParam]);
                 sortParams[sortParam] = order
             }
         }
-        console.log(sortParams);
-        // pipeline.push({ $sort: sortParams });
+        console.log(sortParams); //{rating:-1,price:1}
+        pipeline.push({ $sort: sortParams });
     }
+
+
 
     pipeline.push({
         // facet runs the two pipelines parellely data and filteredTotal
         $facet: {
             data: [
-                // takes the documents who match this criteria
-                { $match: matchStage },
-                { $sort: sortParams },
                 // will skip previous products --> for 11 to 20 , skip 1 to 10
                 { $skip: (parseInt(page) - 1) * parseInt(limit) },
                 // only take 10 products
@@ -311,6 +316,8 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 
     // take the product id from params
     const { id } = req.params
+
+    console.log('going to take details');
 
     if (!checker(req.params))
         throw new ApiError(400, "please provide an id")
@@ -451,8 +458,6 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
             }
         ]
     );
-
-    console.log('product ', product);
 
     res.status(200).json({
         success: true,

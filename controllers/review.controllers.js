@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import reviewModel from "../models/review.models.js";
-import { ApiError } from "../utils/ApiError";
+import { ApiError } from "../utils/ApiError.js";
 import { catchAsyncError } from "../utils/catchAsyncError.js";
 
 const createReview = catchAsyncError(async (req, res, next) => {

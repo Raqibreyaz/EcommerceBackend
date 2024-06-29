@@ -2,7 +2,7 @@ import { cartModel, orderModel } from "../models/CartAndOrder.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { catchAsyncError } from "../utils/catchAsyncError.js";
 import mongoose from "mongoose";
-import { checker, checkArrayd, checkArrays } from '../utils/objectAndArrayChecker.js'
+import { checker, checkArrays } from '../utils/objectAndArrayChecker.js'
 
 // create an order 
 const createOrder = catchAsyncError(async (req, res, next) => {
