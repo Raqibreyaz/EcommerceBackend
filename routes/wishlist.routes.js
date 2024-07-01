@@ -10,9 +10,9 @@ const router = express.Router()
 
 router.use(verifyCustomer)
 
-router.route('/add-product')
+router.route('/add-product/:id')
     .put(addProductToWishlist)
-router.route('/delete-product')
+router.route('/delete-product/:id')
     .delete(removeProductFromWishlist)
 router.route('/get-wishlist')
     .get(fetchWishlist)

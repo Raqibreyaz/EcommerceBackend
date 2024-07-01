@@ -1,36 +1,57 @@
 import productModel from '../models/product.models.js'
 import wishlistModel from '../models/wishlist.models.js'
+import { ApiError } from '../utils/ApiError.js'
 import { catchAsyncError } from '../utils/catchAsyncError.js'
+import { checker } from '../utils/objectAndArrayChecker.js'
+import mongoose from 'mongoose'
 
 const addProductToWishlist = catchAsyncError(async (req, res, next) => {
 
-    const productId = req.params.id
+    if (!checker({ ...req.body, id: req.params.id }, {}, 3))
+        throw new ApiError(400, "please provide necessary details")
+
+    const productId = mongoose.Types.ObjectId.createFromHexString(req.params.id)
+
     // image is the url
-    const { color, size, image } = req.body
+    const { color, size } = req.body
     const userId = req.user.id
 
-    // let wishlist = await wishlistModel.findOne({ userId })
-    // if (!wishlist)
-    //     wishlist = await wishlistModel.create({
-    //         userId,
-    //         products: []
-    //     })
-    // wishlist.products.push(productId)
-    // await wishlist.save()
+    let wishlist = await wishlistModel.findOne({ userId })
 
-    let wishlist = await wishlistModel.updateOne({ userId }, {
-        // create a wishlist if no wishlist is found
-        $setOnInsert: { userId, products: [] },
-        // push the id to the wishlist products
-        $push: {
-            products: {
-                productId,
-                color,
-                size,
-                image
-            }
+    // there should be only one product of the same id in wishlist
+    if (wishlist) {
+        const productIndex = wishlist.products.findIndex((wishlistProduct) => wishlistProduct.productId.equals(productId))
+
+        // when the product is present
+        if (productIndex !== -1)
+            throw new ApiError(400, "product already exists in wishlist")
+    }
+    // when wishlist not exists then create a new wishlist
+    else {
+        wishlist = await wishlistModel.create({
+            userId,
+            products: []
+        })
+    }
+
+    const product = await productModel.findById(productId)
+
+    // extract the mainimage of that color
+    const image = product.colors.find((pcolor) => pcolor.color === color)
+        .images.find(colorImage => colorImage.is_main)
+        .image.url
+
+    // add the product to wishlist
+    wishlist.products.push(
+        {
+            productId,
+            color,
+            size,
+            image
         }
-    }, { upsert: true })
+    )
+
+    await wishlist.save()
 
     res.status(200).json({
         success: true,
@@ -41,15 +62,21 @@ const addProductToWishlist = catchAsyncError(async (req, res, next) => {
 
 const removeProductFromWishlist = catchAsyncError(async (req, res, next) => {
 
+    if (!checker({ ...req.body, id: req.params.id }, {}, 3))
+        throw new ApiError(400, "provide full details")
+
     const productId = req.params.id
     const { color, size } = req.body
     const userId = req.user.id
 
     // now find the wishlist of that user
-    const wishlist = await wishlistModel.updateOne(
+    const result = await wishlistModel.updateOne(
         { userId },
         { $pull: { products: { productId, color, size } } },
         { new: true })
+
+    if (!result.modifiedCount)
+        throw new ApiError(404, "product not found in the wishlist")
 
     res.status(200).json({
         success: true,
@@ -64,6 +91,8 @@ const fetchWishlist = catchAsyncError(async (req, res, next) => {
     const userId = req.user.id
 
     const wishlist = await wishlistModel.findOne({ userId })
+
+    console.log('fetched wishlist ', wishlist);
 
     let wishlistProducts = []
 

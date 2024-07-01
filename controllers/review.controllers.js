@@ -26,6 +26,7 @@ const createReview = catchAsyncError(async (req, res, next) => {
 }
 )
 
+// fetch reviews through product id
 const fetchReviews = catchAsyncError(async (req, res, next) => {
 
     const productId = req.params.id
@@ -49,9 +50,31 @@ const fetchReviews = catchAsyncError(async (req, res, next) => {
             $limit: limit
         },
         {
+            $lookup: {
+                from: 'users',
+                localField: "userId",
+                foreignField: "_id",
+                as: "reviewersDetails"
+            }
+        },
+        { $unwind: "$reviewersDetails" },
+        {
+            $addFields: {
+                user: {
+                    fullname: "$reviewersDetails.fullname",
+                    _id: "$reviewersDetails._id",
+                    avatar: "$reviewersDetails.avatar",
+                    address: {
+                        $arrayElemAt: ["$reviewersDetails.addresses", 0]
+                    }
+                }
+            }
+        },
+        {
             $project: {
                 productId: 0,
-                userId: 0
+                userId: 0,
+                reviewersDetails: 0
             }
         }
     ])
@@ -64,6 +87,7 @@ const fetchReviews = catchAsyncError(async (req, res, next) => {
 
 })
 
+// edit review using review id
 const editReview = catchAsyncError(async (req, res, next) => {
     const userId = req.user.id
     const { oneWord, review, rating } = req.body

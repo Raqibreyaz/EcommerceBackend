@@ -15,6 +15,8 @@ const addToCart = catchAsyncError(async (req, res, next) => {
     if (!checker({ ...req.body }))
         throw new ApiError(400, "provide full details")
 
+    console.log(req.body);
+
     quantity = parseInt(quantity)
 
     const product = await productModel.findById(productId)
@@ -51,13 +53,9 @@ const addToCart = catchAsyncError(async (req, res, next) => {
         userCart.products[productIndex].quantity = quantity
     }
     else {
-
-        // first find the doc having that color
-        const image = product.colors.filter((productColor) => {
-            return productColor.color === color
-            // it will return an array we want 0th elem ,it has the images array containing the main image
-            // it will return an array we want 0th elem its image keys url has the image url
-        })[0].images.filter(image => image.is_main)[0].image.url
+        const image = product.colors.find((pcolor) => pcolor.color === color)
+            .images.find(colorImage => colorImage.is_main)
+            .image.url
 
         userCart.products.push({
             product: product._id,

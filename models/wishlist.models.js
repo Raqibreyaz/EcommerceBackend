@@ -5,7 +5,8 @@ const wishlistSchema = new mongoose.Schema({
         {
             productId: {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: 'product'
+                ref: 'product',
+                unique: true
             },
             color: {
                 type: String,
@@ -25,7 +26,8 @@ const wishlistSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
         index: true,
-        required: true
+        required: true,
+        unique: true
     }
 })
 

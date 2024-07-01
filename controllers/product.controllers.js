@@ -27,7 +27,7 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         stocks,
     } = req.body;
 
-    if (checker(req.body, { isReturnable, discount }))
+    if (checker(req.body, { isReturnable, discount }, 11))
         throw new ApiError(400, "provide full info of the product")
 
     let productCategory = await categoryModel.findOne({ name: category.toLowerCase() })
@@ -158,7 +158,6 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
     res.status(200).json({
         success: true,
         message: 'product created successfully',
-        product
     })
 }
 )
@@ -317,147 +316,112 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
     // take the product id from params
     const { id } = req.params
 
-    console.log('going to take details');
-
     if (!checker(req.params))
         throw new ApiError(400, "please provide an id")
 
-    const product = await productModel.aggregate(
-        [
-            {
-                $match: {
-                    _id: mongoose.Types.ObjectId.createFromHexString(id)
-                }
-            },
-            {
-                $lookup: {
-                    from: "users",
-                    localField: "owner",
-                    foreignField: "_id",
-                    as: "ownerDetails"
-                }
-            },
-            {
-                $lookup: {
-                    from: "reviews",
-                    localField: "reviews",
-                    foreignField: "_id",
-                    as: "productReviews"
-                }
-            },
-            {
-                $lookup: {
-                    from: "users",
-                    localField: "productReviews.userId",
-                    foreignField: "_id",
-                    as: "reviewers"
-                }
-            },
-            {
-                $addFields: {
-                    // colors: {
-                    //     $map: {
-                    //         input: "$colors",
-                    //         as: "color",
-                    //         in: {
-                    //             color: "$$color.color",
-                    //             images: {
-                    //                 $map: {
-                    //                     input: "$$color.images",
-                    //                     as: "imageObj",
-                    //                     in: {
-                    //                         image: {
-                    //                             // taking 0th element from the returned array
-                    //                             $arrayElemAt: [
-                    //                                 {
-                    //                                     // finding the populated image which have the given id
-                    //                                     $map: {
-                    //                                         input: "$imageDetails",
-                    //                                         as: "imageDetail",
-                    //                                         in: {
-                    //                                             $cond: {
-                    //                                                 if: { eq: ["$$imageDetail._id", "$$imageObj.image"] },
-                    //                                                 then: {
-                    //                                                     _id: "$$imageDetail._id",
-                    //                                                     url: "$$imageDetail.url"
-                    //                                                 },
-                    //                                                 else: null
-                    //                                             }
-                    //                                         },
-                    //                                     }
-                    //                                 }, {
-                    //                                     $indexOfArray: ["$imageDetails._id", "$$imageObj.image"]
-                    //                                 }
-                    //                             ]
-                    //                         },
-                    //                         is_main: "$$imageObj.is_main"
-                    //                     }
-                    //                 }
-                    //             }
-                    //         }
-                    //     }
-                    // },
-                    reviews: {
-                        $map: {
-                            input: "$productReviews",
-                            as: "review",
-                            in: {
-                                user: {
-                                    $arrayElemAt: [
-                                        {
-                                            $map: {
-                                                input: "$reviewers",
-                                                as: "reviewer",
-                                                in: {
-                                                    $cond: {
-                                                        if: { $eq: ["$$reviewer._id", "$$review.userId"] },
-                                                        then: {
-                                                            fullname: "$$reviewer.fullname",
-                                                            avatar: "$$reviewer.avatar.url"
-                                                        },
-                                                        else: null
-                                                    }
-                                                }
+    const product = await productModel.aggregate([
+        {
+            $match: {
+                _id: mongoose.Types.ObjectId.createFromHexString(id)
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "ownerDetails"
+            }
+        },
+        {
+            $lookup: {
+                from: "reviews",
+                localField: "reviews",
+                foreignField: "_id",
+                as: "productReviews"
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "productReviews.userId",
+                foreignField: "_id",
+                as: "reviewers"
+            }
+        },
+        {
+            $addFields: {
+                reviews: {
+                    $map: {
+                        input: "$productReviews",
+                        as: "review",
+                        in: {
+                            user: {
+                                $arrayElemAt: [
+                                    {
+                                        $filter: {
+                                            input: "$reviewers",
+                                            as: "reviewer",
+                                            cond: {
+                                                $eq: ["$$reviewer._id", "$$review.userId"]
                                             }
-                                        },
-                                        {
-                                            $indexOfArray: ["$reviewers._id", "$$review.userId"]
                                         }
-                                    ]
-                                },
-                                oneWord: "$$review.oneWord",
-                                review: "$$review.review",
-                                rating: "review.rating"
-                            }
+                                    },
+                                    0
+                                ]
+                            },
+                            oneWord: "$$review.oneWord",
+                            review: "$$review.review",
+                            rating: "$$review.rating"
                         }
-                    },
-                    owner: {
-                        $arrayElemAt: [
-                            {
-                                $map: {
-                                    input: "$ownerDetails",
-                                    as: "ownerDetail",
-                                    in: {
-                                        fullname: "$$ownerDetail.fullname",
-                                        _id: "$$ownerDetail._id"
-                                    }
+                    }
+                },
+                owner: {
+                    $arrayElemAt: [
+                        {
+                            $map: {
+                                input: "$ownerDetails",
+                                as: "ownerDetail",
+                                in: {
+                                    fullname: "$$ownerDetail.fullname",
+                                    _id: "$$ownerDetail._id"
                                 }
                             }
-                            , 0]
-                    }
-                }
-            },
-            {
-                $project: {
-                    reviewersImages: 0,
-                    reviewers: 0,
-                    imageDetails: 0,
-                    productReviews: 0,
-                    ownerDetails: 0,
+                        },
+                        0
+                    ]
                 }
             }
-        ]
-    );
+        },
+        {
+            $project: {
+                price: 1,
+                discount: 1,
+                description: 1,
+                colors: 1,
+                sizes: 1,
+                stocks: 1,
+                rating: 1,
+                details: 1,
+                isReturnable: 1,
+                returnPolicy: 1,
+                totalStocks: 1,
+                product_name: 1,
+                keyHighlights: 1,
+                owner: 1,
+                category: 1,
+                "reviews.oneWord": 1,
+                "reviews.rating": 1,
+                "reviews.review": 1,
+                "reviews.user.fullname": 1,
+                "reviews.user.avatar": 1,
+                "reviews.user._id": 1,
+                "reviews.user.address": {
+                    $arrayElemAt: ["$reviews.user.addresses", 0]
+                }
+            }
+        }
+    ]);
 
     res.status(200).json({
         success: true,
@@ -468,7 +432,7 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 
 const editProduct = catchAsyncError(async (req, res, next) => {
 
-    if (!checker(req.body, { isReturnable, discount }))
+    if (!checker(req.body, { isReturnable, discount }, 13))
         throw new ApiError(400, "provide necessary details to update product")
 
     let {
