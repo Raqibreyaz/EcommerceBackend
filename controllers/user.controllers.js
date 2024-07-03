@@ -207,6 +207,29 @@ const fetchProductOwners = catchAsyncError(async (req, res, next) => {
 }
 )
 
+const fetchProfileDetails = catchAsyncError(async (req, res, next) => {
+    // fullname
+    // avatar
+
+    // take user id for taking details
+    if (!checker(req.params, {}, 1))
+        throw new ApiError(400, "please provide owner id for products!")
+
+    const { id } = req.params
+
+    const profileDetails = await userModel.findById(id).select('+fullname +avatar +role')
+
+    if (!profileDetails)
+        throw new ApiError(404, "user does not exist")
+
+    res.status(200).json({
+        success: true,
+        message: "profile details fetched successfully",
+        profileDetails
+    })
+}
+)
+
 export {
     registerUser,
     loginUser,
@@ -215,5 +238,6 @@ export {
     editUserProfile,
     changeUserAvatar,
     addNewAddress,
-    fetchProductOwners
+    fetchProductOwners,
+    fetchProfileDetails
 }

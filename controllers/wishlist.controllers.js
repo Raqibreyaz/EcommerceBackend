@@ -92,8 +92,6 @@ const fetchWishlist = catchAsyncError(async (req, res, next) => {
 
     const wishlist = await wishlistModel.findOne({ userId })
 
-    console.log('fetched wishlist ', wishlist);
-
     let wishlistProducts = []
 
     if (wishlist && wishlist.products.length) {

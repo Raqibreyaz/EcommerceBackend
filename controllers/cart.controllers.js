@@ -9,11 +9,13 @@ import userModel from '../models/user.models.js'
 // responsible to add product to cart and update it quantity
 const addToCart = catchAsyncError(async (req, res, next) => {
 
-    const { id: userId } = req.user
-    let { productId, color, size, quantity } = req.body
-
-    if (!checker({ ...req.body }))
+    if (!checker({ ...req.body, ...req.params }, {}, 4))
         throw new ApiError(400, "provide full details")
+
+    const { id: userId } = req.user
+    let { color, size, quantity } = req.body
+    const productId = req.params.id
+
 
     console.log(req.body);
 
@@ -77,6 +79,7 @@ const addToCart = catchAsyncError(async (req, res, next) => {
 
 // fetching cart by updating if any product not available
 const fetchCart = catchAsyncError(async (req, res, next) => {
+
     const { id: userId } = req.user
 
     // get the cart of the user via userId
@@ -190,11 +193,13 @@ const fetchCart = catchAsyncError(async (req, res, next) => {
 
 // delete a specific product from the cart
 const deleteProductFromCart = catchAsyncError(async (req, res, next) => {
-    let { id: userId } = req.user
-    let { productId, color, size } = req.body
 
-    if (!checker({ ...req.body }))
+    if (!checker({ ...req.body, ...req.params }, {}, 3))
         throw new ApiError(400, "please provide full details")
+
+    let { id: userId } = req.user
+    let { color, size } = req.body
+    let productId = req.params.id
 
     userId = mongoose.Types.ObjectId.createFromHexString(userId)
     productId = mongoose.Types.ObjectId.createFromHexString(productId)

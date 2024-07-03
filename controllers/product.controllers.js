@@ -233,8 +233,6 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
         pipeline.push({ $sort: sortParams });
     }
 
-
-
     pipeline.push({
         // facet runs the two pipelines parellely data and filteredTotal
         $facet: {
@@ -316,7 +314,7 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
     // take the product id from params
     const { id } = req.params
 
-    if (!checker(req.params))
+    if (!checker(req.params, {}, 1))
         throw new ApiError(400, "please provide an id")
 
     const product = await productModel.aggregate([

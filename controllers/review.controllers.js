@@ -2,14 +2,16 @@ import mongoose from "mongoose";
 import reviewModel from "../models/review.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { catchAsyncError } from "../utils/catchAsyncError.js";
+import { checker } from '../utils/objectAndArrayChecker.js'
 
 const createReview = catchAsyncError(async (req, res, next) => {
+
+    if (!checker({ ...req.params, ...req.body }, {}, 4))
+        throw new ApiError(400, "please provide all necessary details")
+
     const userId = req.user.id
     const productId = req.params.id
     const { oneWord, review, rating } = req.body
-
-    if (!productId || !review || !rating || !oneWord)
-        throw new ApiError(400, "please provide full details")
 
     const newReview = reviewModel.create({
         userId,
@@ -29,15 +31,23 @@ const createReview = catchAsyncError(async (req, res, next) => {
 // fetch reviews through product id
 const fetchReviews = catchAsyncError(async (req, res, next) => {
 
-    const productId = req.params.id
-    const { page = 1, limit = 10 } = req.query
+    if (!checker(req.params, {}, 1))
+        throw new ApiError(400, "please provide productId to get reviews")
+
+    const productId = mongoose.Types.ObjectId.createFromHexString(req.params.id)
+
+    const { page = 1, limit = 10, rating } = req.query
+
+    const matchFilter = { productId }
+
+    if (rating)
+        matchFilter.rating = { $gte: parseInt(rating) }
 
     // get all the reveiws of that product
     const result = await reviewModel.aggregate([
+        // take all the reviews which match the filter
         {
-            $match: {
-                productId,
-            },
+            $match: matchFilter,
         },
         // sorting reviews based on rating and newest first
         {
@@ -73,7 +83,6 @@ const fetchReviews = catchAsyncError(async (req, res, next) => {
         {
             $project: {
                 productId: 0,
-                userId: 0,
                 reviewersDetails: 0
             }
         }
@@ -82,13 +91,17 @@ const fetchReviews = catchAsyncError(async (req, res, next) => {
     res.status(200).json({
         success: true,
         message: "reviews fetched successfully",
-        reviews: result.length === 0 ? [] : result
+        reviews: result
     })
 
 })
 
 // edit review using review id
 const editReview = catchAsyncError(async (req, res, next) => {
+
+    if (!checker({ ...req.body, ...req.params }, {}, 4))
+        throw new ApiError(400, "please provide all necessary details")
+
     const userId = req.user.id
     const { oneWord, review, rating } = req.body
     const reviewId = req.params.id

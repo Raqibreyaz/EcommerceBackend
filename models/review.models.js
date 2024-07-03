@@ -18,17 +18,18 @@ const reviewSchema = new mongoose.Schema({
         type: String,
         required: true,
         maxLength: [10, "one word contains at most 10 characters"],
-        trim:true
+        trim: true
     },
     review: {
         type: String,
         required: true,
-        minlength: [15, "review must be at least of 10 characters"]
+        minlength: [10, "review must be at least of 10 characters"]
     },
     rating: {
         type: Number,
         required: true,
-        required:true
+        // for fetching reviews as per rating
+        index: true
     }
 }, { timestamps: true })
 

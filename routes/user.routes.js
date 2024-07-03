@@ -1,5 +1,5 @@
 import express from 'express'
-import { fetchUser, loginUser, registerUser, logoutUser, editUserProfile, changeUserAvatar, addNewAddress, fetchProductOwners } from '../controllers/user.controllers.js'
+import { fetchUser, loginUser, registerUser, logoutUser, editUserProfile, changeUserAvatar, addNewAddress, fetchProductOwners, fetchProfileDetails } from '../controllers/user.controllers.js'
 import { verifyAdmin, verifyCustomer } from '../middlewares/verifyUser.js'
 import orderRouter from '../routes/order.routes.js'
 import wishlistRouter from '../routes/wishlist.routes.js'
@@ -23,6 +23,10 @@ router.route('/login')
 
 router.route('/get-product-owners')
     .get(fetchProductOwners)
+
+// id of the user for fetching its showfull details
+router.route('/get-profile-details/:id')
+    .get(fetchProfileDetails)
 
 router.use(verifyCustomer)
 
