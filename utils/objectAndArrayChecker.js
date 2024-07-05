@@ -3,14 +3,16 @@ function checker(object, excludes = {}, noOfKeys = 1) {
 
     let requiredCounter = 0
 
-    for (const key of Object.keys(object)) {
+    if (object) {
+        for (const key of Object.keys(object)) {
 
-        // the key should not be an optional key should be present with its value
-        if (!excludes[key] && !object[key])
-            return false
-        // the key  is not an optional key and is present
-        else if (!excludes[key])
-            requiredCounter++
+            // the key should not be an optional key should be present with its value
+            if (!excludes[key] && !object[key])
+                return false
+            // the key  is not an optional key and is present
+            else if (!excludes[key])
+                requiredCounter++
+        }
     }
 
     // when no of required keys are present then go forward

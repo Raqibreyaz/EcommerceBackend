@@ -5,6 +5,7 @@ import { cartModel } from '../models/CartAndOrder.models.js'
 import { assignJwtToken } from '../utils/assignJwtToken.js'
 import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js'
 import { checker, checkArrays } from '../utils/objectAndArrayChecker.js'
+import mongoose from 'mongoose'
 
 const registerUser = catchAsyncError(async (req, res, next) => {
 
@@ -79,18 +80,24 @@ const loginUser = catchAsyncError(async (req, res, next) => {
 const editUserProfile = catchAsyncError(async (req, res, next) => {
 
     const userId = req.user.id
-    const { addresses, fullname, email, phoneNo, oldPassword, newPassword } = req.body
 
+    // check if all required details are provided
+    if (!checker(req.body, { newPassword: true }, 4))
+        throw new ApiError(400, "provide all necessary details")
+
+    // take all required details
+    const { fullname, email, phoneNo, password, newPassword } = req.body
+
+    // checking password validity
     const user = await userModel.findById(userId)
+    const checkPass = await user.comparePassword(password)
 
-    if (!await user.comparePassword(oldPassword)) {
+    if (!checkPass) {
         throw new ApiError(400, "password not valid")
     }
 
-    if (!fullname || !addresses || !email || !phoneNo)
-        throw new ApiError(400, "provide all necessary fields")
+    const toUpdate = { fullname, email, phoneNo }
 
-    const toUpdate = { fullname, email, phoneNo, addresses }
     if (newPassword)
         toUpdate.password = newPassword
 
@@ -108,10 +115,12 @@ const editUserProfile = catchAsyncError(async (req, res, next) => {
 // only for avatar
 const changeUserAvatar = catchAsyncError(async (req, res, next) => {
 
-    if (!req.files || req.files.avatar) {
+    console.log(req.file);
+
+    if (!req.file) {
         throw new ApiError(400, "provide an avatar")
     }
-    const cloudinaryResponse = await uploadOnCloudinary(req.files.avatar.path)
+    const cloudinaryResponse = await uploadOnCloudinary(req.file.newAvatar.path)
 
     const user = await userModel.findById(req.user.id)
 
@@ -173,6 +182,30 @@ const addNewAddress = catchAsyncError(async (req, res, next) => {
     res.status(200).json({
         success: true,
         message: "user address saved successfully"
+    })
+}
+)
+
+const removeAddress = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.params, {}, 1))
+        throw new ApiError(400, "provide address id to continue")
+
+    const userId = req.user.id
+
+    const addressId = mongoose.Types.ObjectId.createFromHexString(req.params.id)
+
+    await userModel.findByIdAndUpdate(userId, {
+        $pull: {
+            addresses: {
+                _id: addressId
+            }
+        }
+    })
+
+    res.status(200).json({
+        success: true,
+        message: 'user address deleted successfully'
     })
 }
 )
@@ -239,5 +272,6 @@ export {
     changeUserAvatar,
     addNewAddress,
     fetchProductOwners,
-    fetchProfileDetails
+    fetchProfileDetails,
+    removeAddress
 }

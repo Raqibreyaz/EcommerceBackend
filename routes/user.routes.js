@@ -1,5 +1,5 @@
 import express from 'express'
-import { fetchUser, loginUser, registerUser, logoutUser, editUserProfile, changeUserAvatar, addNewAddress, fetchProductOwners, fetchProfileDetails } from '../controllers/user.controllers.js'
+import { fetchUser, loginUser, registerUser, logoutUser, editUserProfile, changeUserAvatar, addNewAddress, fetchProductOwners, fetchProfileDetails, removeAddress } from '../controllers/user.controllers.js'
 import { verifyAdmin, verifyCustomer } from '../middlewares/verifyUser.js'
 import orderRouter from '../routes/order.routes.js'
 import wishlistRouter from '../routes/wishlist.routes.js'
@@ -40,9 +40,12 @@ router.route('/edit-profile')
     .put(editUserProfile)
 
 router.route('/edit-profile/avatar')
-    .patch(upload.single('avatar'), changeUserAvatar)
+    .patch(upload.single('newAvatar'), changeUserAvatar)
 
 router.route('/edit-profile/address')
     .patch(addNewAddress)
+
+router.route('/remove-address/:id')
+    .delete(removeAddress)
 
 export default router

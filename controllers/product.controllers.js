@@ -181,6 +181,13 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
         matchStage.category = { $in: category.split(',') };
     }
 
+    // if productOwners is given for filtering then filter by productOwners
+    if (category) {
+        // { category: 'sarees,kurti' }
+        // $in will get an array containing string separated by ,
+        matchStage.owner = { $in: product_owners.split(',') };
+    }
+
     // if price is given for filtering then filter by price
     if (min_price) {
         const obj = {
