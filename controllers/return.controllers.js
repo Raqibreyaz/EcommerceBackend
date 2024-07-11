@@ -83,14 +83,44 @@ const fetchReturnRequests = catchAsyncError(async (req, res, next) => {
 
     const returnRequests = await returnModel.aggregate([
         { $match: {} },
-        { $sort: { updatedAt: -1 } },
+        { $sort: { createdAt: -1, updatedAt: 1 } },
         { $skip: (page - 1) * limit },
-        { $limit: limit }
+        { $limit: limit },
+        {
+            $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: 'customerDetails'
+            }
+        },
+        {
+            $lookup: {
+                from: "products",
+                localField: "productId",
+                foreignField: "_id",
+                as: 'productDetails'
+            }
+        },
+        { $unwind: "$productDetails" },
+        { $unwind: "$customerDetails" },
+        {},
+        {
+            $project: {
+                _id: 1,
+                customer_name: "customerDetails.fullname",
+                createdAt: 1,
+                status: 1,
+                product_name: "productDetails.product_name",
+                refundAmount: 1
+            }
+        }
     ])
 
     res.status(200).json({
         success: true,
-        message: "return requests fetched successfully"
+        message: "return requests fetched successfully",
+        returnRequests
     })
 }
 )

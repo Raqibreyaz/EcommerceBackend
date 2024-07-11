@@ -182,10 +182,11 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     }
 
     // if productOwners is given for filtering then filter by productOwners
-    if (category) {
+    if (product_owners) {
+        const productOwners = product_owners.split(',').map((ownerId) => mongoose.Types.ObjectId.createFromHexString(ownerId))
         // { category: 'sarees,kurti' }
         // $in will get an array containing string separated by ,
-        matchStage.owner = { $in: product_owners.split(',') };
+        matchStage.owner = { $in: productOwners };
     }
 
     // if price is given for filtering then filter by price
@@ -305,7 +306,7 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     const filteredTotal = result[0].metadata.length ? result[0].metadata[0].totalItems : 0;
     const overallTotal = result[0].overallTotal.length ? result[0].overallTotal[0].count : 0;
 
-    res.json({
+    res.status(200).json({
         products,
         filteredTotal,
         overallTotal,
@@ -437,7 +438,7 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 
 const editProduct = catchAsyncError(async (req, res, next) => {
 
-    if (!checker(req.body, { isReturnable, discount }, 13))
+    if (!checker({ ...req.body, ...req.params }, { isReturnable, discount }, 13))
         throw new ApiError(400, "provide necessary details to update product")
 
     let {
@@ -452,11 +453,12 @@ const editProduct = catchAsyncError(async (req, res, next) => {
         stocks,
         oldColors,
         newColors,
-        productId,
         isReturnable,
         returnPolicy,
         totalStocks,
     } = req.body
+
+    const productId = req.params.id
 
     sizes = JSON.parse(sizes)
     keyHighlights = JSON.parse(keyHighlights)

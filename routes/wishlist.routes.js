@@ -2,7 +2,8 @@ import express from 'express'
 import {
     addProductToWishlist,
     removeProductFromWishlist,
-    fetchWishlist
+    fetchWishlist,
+    isProductInWishlist
 } from '../controllers/wishlist.controllers.js'
 import { verifyCustomer } from '../middlewares/verifyUser.js'
 
@@ -16,5 +17,7 @@ router.route('/delete-product/:id')
     .delete(removeProductFromWishlist)
 router.route('/get-wishlist')
     .get(fetchWishlist)
+router.route('/in-wishlist/:id')
+    .get(isProductInWishlist)
 
 export default router

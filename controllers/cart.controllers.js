@@ -16,9 +16,6 @@ const addToCart = catchAsyncError(async (req, res, next) => {
     let { color, size, quantity } = req.body
     const productId = req.params.id
 
-
-    console.log(req.body);
-
     quantity = parseInt(quantity)
 
     const product = await productModel.findById(productId)
@@ -30,15 +27,12 @@ const addToCart = catchAsyncError(async (req, res, next) => {
 
     // take available stocks
     let stockCheck = product.stocks.filter((stockObj) => {
-        console.log('stock check ', stockObj);
         if (stockObj.color === color && stockObj.size === size) {
             availableStocks = stockObj.stock
             return stockObj.stock >= quantity
         }
         return false
     })
-
-    console.log(stockCheck, availableStocks, quantity);
 
     // condition when stocks are unavailable
     if (availableStocks <= quantity) {
@@ -51,7 +45,6 @@ const addToCart = catchAsyncError(async (req, res, next) => {
     let productIndex = userCart.products.findIndex(p => p.product.equals(productId) && p.color === color && p.size === size)
 
     if (productIndex >= 0) {
-        console.log('product already exists increase quantity');
         userCart.products[productIndex].quantity = quantity
     }
     else {
@@ -72,7 +65,7 @@ const addToCart = catchAsyncError(async (req, res, next) => {
 
     res.status(200).json({
         success: true,
-        message: "operation successfull",
+        message: `Product with quantity ${quantity} Added To Cart`,
     })
 }
 )

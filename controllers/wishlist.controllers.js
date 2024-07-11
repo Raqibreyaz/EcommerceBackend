@@ -168,8 +168,29 @@ const fetchWishlist = catchAsyncError(async (req, res, next) => {
 }
 )
 
+const isProductInWishlist = catchAsyncError(async (req, res, next) => {
+    if (!checker(req.params, {}, 1))
+        throw new ApiError(400, "please provide product id to check presence of product in wishlist")
+
+    const userId = req.user.id
+    const productId = req.params.id
+
+    // products is an array containing objects 
+    const result = await wishlistModel.findOne({
+        userId,
+        "products.productId": productId
+    })
+
+    res.status(200).json({
+        success: true,
+        isInWishlist: !!result
+    })
+}
+)
+
 export {
     addProductToWishlist,
     removeProductFromWishlist,
-    fetchWishlist
+    fetchWishlist,
+    isProductInWishlist
 }

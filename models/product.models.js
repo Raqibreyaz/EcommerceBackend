@@ -40,13 +40,11 @@ const productSchema = new mongoose.Schema({
     product_name: {
         type: String,
         required: true,
-        index: true,
         unique: true
     },
     price: {
         type: Number,
         required: true,
-        index: true,
         min: 0
     },
     isReturnable: {
@@ -65,7 +63,6 @@ const productSchema = new mongoose.Schema({
     discount: {
         type: Number,
         default: 0,
-        index: true,
         min: 0
     },
     description: {
@@ -76,7 +73,6 @@ const productSchema = new mongoose.Schema({
     category: {
         type: String,
         required: true,
-        index: true
     },
     keyHighlights: {
         type: [String],
@@ -91,7 +87,6 @@ const productSchema = new mongoose.Schema({
     owner: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
-        index: true,
         required: true
     },
     thumbnail: {
@@ -132,7 +127,6 @@ const productSchema = new mongoose.Schema({
     rating: {
         type: Number,
         default: 4,
-        index: true,
         min: 0,
         max: 5
     },

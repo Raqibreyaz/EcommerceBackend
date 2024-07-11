@@ -4,8 +4,8 @@ const cartSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
-        index: true,
-        required: true
+        required: true,
+        unique:true
     },
     products: [
         {
@@ -41,7 +41,6 @@ const orderSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
-        index: true
     },
     products: [
         {
@@ -85,7 +84,7 @@ const orderSchema = new mongoose.Schema({
             returnStatus: {
                 type: String,
                 enum: ['return pending', 'return rejected', 'return approved', 'not_requested'],
-                default: 'not_requested'
+                default: 'not_requested',
             }
         }
     ],
@@ -113,7 +112,7 @@ const orderSchema = new mongoose.Schema({
     deliveryStatus: {
         type: String,
         enum: ['delivered', 'pending', 'cancelled', 'returned'],
-        default: 'pending'
+        default: 'pending',
     }
 }, { timestamps: true });
 

@@ -67,7 +67,6 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['customer', 'seller', 'admin', 'delivery boy'],
         default: 'customer',
-        index: true
     },
     addresses: {
         type: [addressSchema],

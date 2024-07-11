@@ -147,11 +147,30 @@ const fetchAllOrders = catchAsyncError(async (req, res, next) => {
 
     const { page = 1, limit = 10 } = req.query
 
-    const result = await orderModel.aggregate([
+    const orders = await orderModel.aggregate([
         { $match: {} },
-        { $sort: { updatedAt: -1 } },
+        // take orders on top which are newly created and updated previously
+        { $sort: { createdAt: -1, updatedAt: 1 } },
         { $skip: (page - 1) * limit },
-        { $limit: limit }
+        { $limit: limit },
+        {
+            $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: 'customerDetails'
+            }
+        },
+        { $unwind: "$customerDetails" },
+        {
+            $project: {
+                deliveryStatus: 1,
+                customer_name: "customerDetails.fullname",
+                totalAmount: 1,
+                noOfProducts: { $size: "$products" },
+                createdAt: 1
+            }
+        }
     ])
 
     console.log(result);
@@ -159,7 +178,7 @@ const fetchAllOrders = catchAsyncError(async (req, res, next) => {
     res.status(200).json({
         success: true,
         message: "orders fetched successfully",
-        orders: result
+        orders
     })
 }
 )

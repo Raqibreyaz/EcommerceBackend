@@ -6,7 +6,6 @@ const reviewSchema = new mongoose.Schema({
     productId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'product',
-        index: true,
         required: true
     },
     userId: {
@@ -29,7 +28,6 @@ const reviewSchema = new mongoose.Schema({
         type: Number,
         required: true,
         // for fetching reviews as per rating
-        index: true
     }
 }, { timestamps: true })
 

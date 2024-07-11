@@ -13,6 +13,10 @@ const returnSchema = new mongoose.Schema({
         ref: 'user',
         required: true
     },
+    refundAmount: {
+        type: Number,
+        required: true,
+    },
     orderId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'order',
@@ -23,7 +27,7 @@ const returnSchema = new mongoose.Schema({
         required: true,
         validate: {
             validator: (images) => {
-                return images.length > 3 && images.length <= 5
+                return images.length >= 3 && images.length <= 5
             },
             message: "only 3 to 5 images are required"
         }

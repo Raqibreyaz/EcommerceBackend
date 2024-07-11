@@ -69,8 +69,8 @@ const loginUser = catchAsyncError(async (req, res, next) => {
 
     let checkPassword = await user.comparePassword(password)
 
-    if (!checkPassword)
-        throw new ApiError(400, "invalid credentials")
+    // if (!checkPassword)
+    //     throw new ApiError(400, "invalid credentials")
 
     assignJwtToken(user, res, "user logged in successfully")
 }
@@ -263,6 +263,20 @@ const fetchProfileDetails = catchAsyncError(async (req, res, next) => {
 }
 )
 
+
+const fetchSellers = catchAsyncError(async (req, res) => {
+
+    const sellers = await userModel.findOne({ role: 'seller' }).select('+fullname +avatar +phoneNo +email')
+
+    res.status(200).json({
+        success: true,
+        message: "sellers fetched successfully",
+        sellers
+    })
+}
+)
+
+
 export {
     registerUser,
     loginUser,
@@ -273,5 +287,6 @@ export {
     addNewAddress,
     fetchProductOwners,
     fetchProfileDetails,
-    removeAddress
+    removeAddress,
+    fetchSellers
 }
