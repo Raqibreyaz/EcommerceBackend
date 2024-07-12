@@ -3,6 +3,292 @@ import { ApiError } from "../utils/ApiError.js";
 import { catchAsyncError } from "../utils/catchAsyncError.js";
 import mongoose from "mongoose";
 import { checker, checkArrays } from '../utils/objectAndArrayChecker.js'
+import { instance } from '../server.js'
+import { v4 as uuidv4 } from 'uuid'
+
+// Razorpay {
+//     key_id: '',
+//     key_secret: '',
+//     api: API {
+//       version: 'v1',
+//       rq: [Function: wrap] {
+//         constructor: [Function: wrap],
+//         request: [Function: wrap],
+//         _request: [Function: wrap],
+//         getUri: [Function: wrap],
+//         delete: [Function: wrap],
+//         get: [Function: wrap],
+//         head: [Function: wrap],
+//         options: [Function: wrap],
+//         post: [Function: wrap],
+//         postForm: [Function: wrap],
+//         put: [Function: wrap],
+//         putForm: [Function: wrap],
+//         patch: [Function: wrap],
+//         patchForm: [Function: wrap],
+//         defaults: [Object],
+//         interceptors: [Object],
+//         create: [Function: create]
+//       }
+//     },
+//     accounts: {
+//       create: [Function: create],
+//       edit: [Function: edit],
+//       fetch: [Function: fetch],
+//       delete: [Function: _delete],
+//       uploadAccountDoc: [Function: uploadAccountDoc],
+//       fetchAccountDoc: [Function: fetchAccountDoc]
+//     },
+//     stakeholders: {
+//       create: [Function: create],
+//       edit: [Function: edit],
+//       fetch: [Function: fetch],
+//       all: [Function: all],
+//       uploadStakeholderDoc: [Function: uploadStakeholderDoc],
+//       fetchStakeholderDoc: [Function: fetchStakeholderDoc]
+//     },
+//     payments: {
+//       all: [Function: all],
+//       fetch: [Function: fetch],
+//       capture: [Function: capture],
+//       createPaymentJson: [Function: createPaymentJson],
+//       createRecurringPayment: [Function: createRecurringPayment],
+//       edit: [Function: edit],
+//       refund: [Function: refund],
+//       fetchMultipleRefund: [Function: fetchMultipleRefund],
+//       fetchRefund: [Function: fetchRefund],
+//       fetchTransfer: [Function: fetchTransfer],
+//       transfer: [Function: transfer],
+//       bankTransfer: [Function: bankTransfer],
+//       fetchCardDetails: [Function: fetchCardDetails],
+//       fetchPaymentDowntime: [Function: fetchPaymentDowntime],
+//       fetchPaymentDowntimeById: [Function: fetchPaymentDowntimeById],
+//       otpGenerate: [Function: otpGenerate],
+//       otpSubmit: [Function: otpSubmit],
+//       otpResend: [Function: otpResend],
+//       createUpi: [Function: createUpi],
+//       validateVpa: [Function: validateVpa],
+//       fetchPaymentMethods: [Function: fetchPaymentMethods]
+//     },
+//     refunds: {
+//       all: [Function: all],
+//       edit: [Function: edit],
+//       fetch: [Function: fetch]
+//     },
+//     orders: {
+//       all: [Function: all],
+//       fetch: [Function: fetch],
+//       create: [Function: create],
+//       edit: [Function: edit],
+//       fetchPayments: [Function: fetchPayments],
+//       fetchTransferOrder: [Function: fetchTransferOrder],
+//       viewRtoReview: [Function: viewRtoReview],
+//       editFulfillment: [Function: editFulfillment]
+//     },
+//     customers: {
+//       create: [Function: create],
+//       edit: [Function: edit],
+//       fetch: [Function: fetch],
+//       all: [Function: all],
+//       fetchTokens: [Function: fetchTokens],
+//       fetchToken: [Function: fetchToken],
+//       deleteToken: [Function: deleteToken],
+//       addBankAccount: [Function: addBankAccount],
+//       deleteBankAccount: [Function: deleteBankAccount],
+//       requestEligibilityCheck: [Function: requestEligibilityCheck],
+//       fetchEligibility: [Function: fetchEligibility]
+//     },
+//     transfers: {
+//       all: [Function: all],
+//       fetch: [Function: fetch],
+//       create: [Function: create],
+//       edit: [Function: edit],
+//       reverse: [Function: reverse],
+//       fetchSettlements: [Function: fetchSettlements]
+//     },
+//     tokens: {
+//       create: [Function: create],
+//       fetch: [Function: fetch],
+//       delete: [Function: _delete],
+//       processPaymentOnAlternatePAorPG: [Function: processPaymentOnAlternatePAorPG]
+//     },
+//     virtualAccounts: {
+//       all: [Function: all],
+//       fetch: [Function: fetch],
+//       create: [Function: create],
+//       close: [Function: close],
+//       fetchPayments: [Function: fetchPayments],
+//       addReceiver: [Function: addReceiver],
+//       allowedPayer: [Function: allowedPayer],
+//       deleteAllowedPayer: [Function: deleteAllowedPayer]
+//     },
+//     invoices: {
+//       create: [Function: create],
+//       edit: [Function: edit],
+//       issue: [Function: issue],
+//       delete: [Function: _delete],
+//       cancel: [Function: cancel],
+//       fetch: [Function: fetch],
+//       all: [Function: all],
+//       notifyBy: [Function: notifyBy]
+//     },
+//     iins: { fetch: [Function: fetch], all: [Function: all] },
+//     paymentLink: {
+//       create: [Function: create],
+//       cancel: [Function: cancel],
+//       fetch: [Function: fetch],
+//       all: [Function: all],
+//       edit: [Function: edit],
+//       notifyBy: [Function: notifyBy]
+//     },
+//     plans: {
+//       create: [Function: create],
+//       fetch: [Function: fetch],
+//       all: [Function: all]
+//     },
+//     products: {
+//       requestProductConfiguration: [Function: requestProductConfiguration],     
+//       edit: [Function: edit],
+//       fetch: [Function: fetch],
+//       fetchTnc: [Function: fetchTnc]
+//     },
+//     subscriptions: {
+//       create: [Function: create],
+//       fetch: [Function: fetch],
+//       update: [Function: update],
+//       pendingUpdate: [Function: pendingUpdate],
+//       cancelScheduledChanges: [Function: cancelScheduledChanges],
+//       pause: [Function: pause],
+//       resume: [Function: resume],
+//       deleteOffer: [Function: deleteOffer],
+//       all: [Function: all],
+//       cancel: [Function: cancel],
+//       createAddon: [Function: createAddon],
+//       createRegistrationLink: [Function: createRegistrationLink]
+//     },
+//     addons: {
+//       fetch: [Function: fetch],
+//       delete: [Function: _delete],
+//       all: [Function: all]
+//     },
+//     settlements: {
+//       createOndemandSettlement: [Function: createOndemandSettlement],
+//       all: [Function: all],
+//       fetch: [Function: fetch],
+//       fetchOndemandSettlementById: [Function: fetchOndemandSettlementById],     
+//       fetchAllOndemandSettlement: [Function: fetchAllOndemandSettlement],       
+//       reports: [Function: reports]
+//     },
+//     qrCode: {
+//       create: [Function: create],
+//       all: [Function: all],
+//       fetchAllPayments: [Function: fetchAllPayments],
+//       fetch: [Function: fetch],
+//       close: [Function: close]
+//     },
+//     fundAccount: { create: [Function: create], fetch: [Function: fetch] },      
+//     items: {
+//       all: [Function: all],
+//       fetch: [Function: fetch],
+//       create: [Function: create],
+//       edit: [Function: edit],
+//       delete: [Function: _delete]
+//     },
+//     cards: {
+//       fetch: [Function: fetch],
+//       requestCardReference: [Function: requestCardReference]
+//     },
+//     webhooks: {
+//       create: [Function: create],
+//       edit: [Function: edit],
+//       all: [Function: all],
+//       fetch: [Function: fetch],
+//       delete: [Function: _delete]
+//     },
+//     documents: { create: [Function: create], fetch: [Function: fetch] },        
+//     disputes: {
+//       fetch: [Function: fetch],
+//       all: [Function: all],
+//       accept: [Function: accept],
+//       contest: [Function: contest]
+//     }
+//   }
+
+// {
+//     "success": true,
+//     "order": {
+//         "amount": 50000,
+//         "amount_due": 50000,
+//         "amount_paid": 0,
+//         "attempts": 0,
+//         "created_at": 1720802125,
+//         "currency": "INR",
+//         "entity": "order",
+//         "id": "order_OXmxdifFN0bmCR",
+//         "notes": [],
+//         "offer_id": null,
+//         "receipt": null,
+//         "status": "created"
+//     }
+// }
+
+const createRazorPayOrder = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.body, {}, 2))
+        throw new ApiError(400, "provide necessary details to initiate order")
+
+    const { customer_name, amount } = req.body
+    const { id: customerId } = req.user.id
+
+    const order = await instance.orders.create({
+        amount,
+        currency: "INR",
+        receipt: `receipt_${uuidv4()}`,
+        notes: {
+            customerId,
+            customer_name,
+        }
+    })
+
+order.RAZORPAY_KEY = process.env.RAZORPAY_KEY
+
+    res.status(200).json({
+        success: true,
+        order
+    })
+}
+)
+
+const verifyRazorPayPayment = catchAsyncError(async (req, res, next) => {
+
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+    // Verify payment signature (implementation of verifyRazorpaySignature not shown)
+    const isPaymentValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+
+    if (isPaymentValid) {
+        res.status(201).json({
+            success: true,
+            isPaymentVerified: isPaymentValid
+        });
+    } else {
+        throw new ApiError(400, 'Invalid payment signature')
+    }
+
+    function verifyRazorpaySignature(orderId, paymentId, signature) {
+
+        // the razorpay signature is also created using the hmac with sha256 hashing algorithm by concatenating orderid and paymentid with |
+
+        const secret = process.env.RAZORPAY_SECRET;
+
+        // 
+        const hmac = crypto.createHmac('sha256', secret);
+        hmac.update(orderId + '|' + paymentId);
+        const generatedSignature = hmac.digest('hex');
+
+        return generatedSignature === signature;
+    };
+})
 
 // create an order 
 const createOrder = catchAsyncError(async (req, res, next) => {
@@ -125,14 +411,16 @@ const fetchOrders = catchAsyncError(async (req, res, next) => {
 
 const fetchOrderDetails = catchAsyncError(async (req, res, next) => {
 
-    const orderId = req.params.id
-
-    if (orderId)
+    if (!checker(req.params, {}, 1))
         throw new ApiError(400, "provide an order id to get details")
+
+    const orderId = req.params.id
 
     console.log('reached to get details');
 
     const orderDetails = await orderModel.findById(orderId)
+
+
 
     res.status(200).json({
         success: true,
@@ -165,15 +453,15 @@ const fetchAllOrders = catchAsyncError(async (req, res, next) => {
         {
             $project: {
                 deliveryStatus: 1,
-                customer_name: "customerDetails.fullname",
+                customer_name: "$customerDetails.fullname",
                 totalAmount: 1,
                 noOfProducts: { $size: "$products" },
-                createdAt: 1
+                createdAt: 1,
+                _id: 1
             }
         }
     ])
 
-    console.log(result);
 
     res.status(200).json({
         success: true,
@@ -249,5 +537,7 @@ export {
     changeReturnStatus,
     fetchAllOrders,
     fetchOrders,
-    fetchOrderDetails
+    fetchOrderDetails,
+    createRazorPayOrder,
+    verifyRazorPayPayment
 }

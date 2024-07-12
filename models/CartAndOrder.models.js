@@ -5,7 +5,7 @@ const cartSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
         required: true,
-        unique:true
+        unique: true
     },
     products: [
         {
@@ -102,6 +102,25 @@ const orderSchema = new mongoose.Schema({
     totalAmount: {
         type: Number,
         required: true
+    },
+    paymentDetails: {
+        razorpayOrderId: {
+            type: String,
+        },
+        razorpayPaymentId: {
+            type: String,
+        },
+        paymentMode: {
+            type: String,
+            enum: ['cash on delivery', 'online']
+        },
+        paymentStatus: {
+            type: String,
+            // pending is for cash on delivery 
+            // cancelled is for order cancelletion
+            enum: ['pending', 'fulfilled', 'cancelled'],
+            default: "pending"
+        }
     },
     deliveryAddress: {
         state: String,
