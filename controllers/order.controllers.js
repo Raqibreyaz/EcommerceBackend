@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { checker, checkArrays } from '../utils/objectAndArrayChecker.js'
 import { instance } from '../server.js'
 import { v4 as uuidv4 } from 'uuid'
+import crypto from 'crypto'
 
 // Razorpay {
 //     key_id: '',
@@ -240,31 +241,35 @@ const createRazorPayOrder = catchAsyncError(async (req, res, next) => {
     const { customer_name, amount } = req.body
     const { id: customerId } = req.user.id
 
+
     const order = await instance.orders.create({
-        amount,
+        amount: parseInt(amount) * 100,
         currency: "INR",
-        receipt: `receipt_${uuidv4()}`,
+        receipt: `receipt_${uuidv4().slice(0, 5)}`,
         notes: {
             customerId,
             customer_name,
         }
     })
 
-order.RAZORPAY_KEY = process.env.RAZORPAY_KEY
+    order.RAZORPAY_KEY = process.env.RAZORPAY_KEY
 
     res.status(200).json({
         success: true,
-        order
+        order,
+        message: "razorpay order created successfully"
     })
 }
 )
 
 const verifyRazorPayPayment = catchAsyncError(async (req, res, next) => {
 
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    console.log(req.body);
 
     // Verify payment signature (implementation of verifyRazorpaySignature not shown)
-    const isPaymentValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+    const isPaymentValid = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
 
     if (isPaymentValid) {
         res.status(201).json({
@@ -281,11 +286,13 @@ const verifyRazorPayPayment = catchAsyncError(async (req, res, next) => {
 
         const secret = process.env.RAZORPAY_SECRET;
 
-        // 
         const hmac = crypto.createHmac('sha256', secret);
         hmac.update(orderId + '|' + paymentId);
+
+        // convert the hmac into readable hex string
         const generatedSignature = hmac.digest('hex');
 
+        // when both strings match then it is verified
         return generatedSignature === signature;
     };
 })
@@ -297,31 +304,32 @@ const createOrder = catchAsyncError(async (req, res, next) => {
 
     let userId = req.user.id
 
-    if (!checker(req.body))
+    // req.body-->products[],paymentDetails{},deliveryAddress{},totalPrice,totalAmount,totalDiscount
+
+    // checking if all the required details are provided
+    if (!checker(req.body, {}, 6))
         throw new ApiError(400, "please provide complete details of the order")
 
-    if (checkArrays({ products }))
-        throw new ApiError(400, "order should have at least one product")
+    // checking if all the required payment details are provided
+    if (!checker(req.body.paymentDetails, { razorpayOrderId: true, razorpayPaymentId: true }, 2))
+        throw new ApiError(400, "provide necessary payment details")
 
-    let {
-        products,
-        totalPrice,
-        totalDiscount,
-        totalAmount,
-        deliveryAddress
-    } = req.body
+    // checking if address is provided
+    if (!checker(req.body.deliveryAddress, {}, 4))
+        throw new ApiError(400, "provide necessary payment details")
+
+    // checking if there is at least one product present 
+    if (checkArrays({ products: req.body.products }) === 'products')
+        throw new ApiError(400, "order should have at least one product")
 
     // products-->[{product,product_name,quantity,size,color,price,discount,image}]
 
-    let newOrder = await orderModel.create({
+    await orderModel.create({
         userId: req.user.id,
-        products,
-        totalPrice,
-        totalDiscount,
-        totalAmount,
-        deliveryAddress
+        ...req.body
     })
 
+    // clear the cart when an order is placed successfully
     await cartModel.findOneAndUpdate({ userId }, {
         $set: { products: [] }
     })
@@ -414,13 +422,7 @@ const fetchOrderDetails = catchAsyncError(async (req, res, next) => {
     if (!checker(req.params, {}, 1))
         throw new ApiError(400, "provide an order id to get details")
 
-    const orderId = req.params.id
-
-    console.log('reached to get details');
-
-    const orderDetails = await orderModel.findById(orderId)
-
-
+    const orderDetails = await orderModel.findById(req.params.id)
 
     res.status(200).json({
         success: true,

@@ -69,8 +69,8 @@ const loginUser = catchAsyncError(async (req, res, next) => {
 
     let checkPassword = await user.comparePassword(password)
 
-    // if (!checkPassword)
-    //     throw new ApiError(400, "invalid credentials")
+    if (!checkPassword)
+        throw new ApiError(400, "invalid credentials")
 
     assignJwtToken(user, res, "user logged in successfully")
 }
@@ -90,20 +90,28 @@ const editUserProfile = catchAsyncError(async (req, res, next) => {
 
     // checking password validity
     const user = await userModel.findById(userId)
-    const checkPass = await user.comparePassword(password)
 
+    const checkPass = await user.comparePassword(password)
     if (!checkPass) {
         throw new ApiError(400, "password not valid")
     }
 
     const toUpdate = { fullname, email, phoneNo }
 
+    // when new password is given then change password
     if (newPassword)
         toUpdate.password = newPassword
 
-    await userModel.findByIdAndUpdate(userId, {
-        $set: toUpdate
-    })
+    // update the fields
+    for (const key in toUpdate) {
+        if (Object.hasOwnProperty.call(toUpdate, key)) {
+            const value = toUpdate[key];
+            user[key] = value
+        }
+    }
+
+    // save the updated user
+    await user.save()
 
     res.status(200).json({
         success: true,

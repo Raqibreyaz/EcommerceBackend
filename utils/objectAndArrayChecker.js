@@ -24,7 +24,7 @@ function checkArrays(object) {
     for (const arrayName in object) {
         if (Object.hasOwnProperty.call(object, arrayName)) {
             const array = object[arrayName];
-            if (array.length === 0)
+            if (!array || array.length === 0)
                 return arrayName
         }
     }
