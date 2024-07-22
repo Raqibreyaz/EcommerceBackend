@@ -343,27 +343,21 @@ const createOrder = catchAsyncError(async (req, res, next) => {
 
 const updateOrder = catchAsyncError(async (req, res, next) => {
 
-    if (checker({ ...req.body, id: req.params.id }))
-        throw new ApiError(400, "provide at least one info of the order")
+    if (!checker({ ...req.body, id: req.params.id }, { deliveredAt: true }, 2))
+        throw new ApiError(400, "provide necessary info of the order")
 
     const {
-        deliveryStatus = '',
-        deliveredAt = '',
+        deliveryStatus,
     } = req.body
 
-    const { id } = req.params
+    const order = await orderModel.findById(req.params.id)
 
-    const order = await orderModel.findById(id)
+    order.deliveryStatus = deliveryStatus
 
-    if (deliveryStatus) {
-        order.deliveryStatus = deliveryStatus
-    }
+    if (deliveryStatus === 'delivered')
+        order.deliveredAt = Date.now()
 
-    if (deliveredAt) {
-        order.deliveredAt = deliveredAt
-    }
-
-    order.save()
+    await order.save()
 
     res.status(200).json({
         success: true,
@@ -432,10 +426,42 @@ const fetchOrderDetails = catchAsyncError(async (req, res, next) => {
 }
 )
 
+const cancelOrder = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.params, {}, 1))
+        throw new ApiError(400, 'provide order id to cancel order')
+
+    const {
+        deliveryStatus,
+    } = req.body
+
+    const order = await orderModel.findById(req.params.id)
+
+    const currentDate = new Date()
+    const givenDate = new Date(order.createdAt)
+
+    const millisecondDiff = currentDate - givenDate
+
+    const hoursDifference = millisecondDiff / 1000 * 60 * 60
+
+    if (hoursDifference >= 3)
+        throw new ApiError(400, "cannot cancel after 3 hours")
+
+    order.deliveryStatus = 'cancelled'
+
+    await order.save()
+
+    res.status(200).json({
+        success: true,
+        message: "order cancelled successfully"
+    })
+
+}
+)
 
 const fetchAllOrders = catchAsyncError(async (req, res, next) => {
 
-    const { page = 1, limit = 10 } = req.query
+    const { page = 1, limit = 15 } = req.query
 
     const orders = await orderModel.aggregate([
         { $match: {} },
@@ -540,6 +566,7 @@ export {
     fetchAllOrders,
     fetchOrders,
     fetchOrderDetails,
+    cancelOrder,
     createRazorPayOrder,
     verifyRazorPayPayment
 }

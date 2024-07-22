@@ -2,10 +2,9 @@ import mongoose from 'mongoose'
 import { validate } from 'uuid'
 
 const returnSchema = new mongoose.Schema({
-    // product id is the id of the product in the order
+    // product id is the _id of the product in the products array
     productId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'product',
         required: true
     },
     userId: {
@@ -37,7 +36,7 @@ const returnSchema = new mongoose.Schema({
         required: true,
         minLength: [25, "you must fully describe your reason"]
     },
-    toExchange: {
+    toReplace: {
         type: Boolean,
         default: false
     },

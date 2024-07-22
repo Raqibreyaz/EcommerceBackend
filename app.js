@@ -14,7 +14,8 @@ connectToDatabase()
 
 app.use(cors({
   origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
-  credentials: true
+  credentials: true,
+  methods: ['PUT', 'POST', 'GET', 'PATCH', 'DELETE']
 }))
 
 app.use(cookieParser())

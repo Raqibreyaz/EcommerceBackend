@@ -1,20 +1,27 @@
 import { ApiError } from "../utils/ApiError.js";
 import { catchAsyncError } from "../utils/catchAsyncError.js";
-import { changeReturnStatus } from "./orders.controllers.js";
+import { changeReturnStatus } from "./order.controllers.js";
 import { uploadOnCloudinary } from '../utils/cloudinary.js'
 import returnModel from "../models/return.models.js";
+import { checker } from "../utils/objectAndArrayChecker.js";
 
 const createReturnRequest = catchAsyncError(async (req, res, next) => {
 
+    if (!checker({ ...req.body, ...req.params }, { toReplace: true }, 4))
+        throw new ApiError(400, "provide all details to create return request")
+
     const userId = req.user.id
+
+    const orderId = req.params.id
 
     const {
         productId,
-        orderId,
         reason,
-        toExchange = false,
+        toReplace = false,
         pickupAddress
     } = req.body
+
+console.log(req.files);
 
     if (req.files.length < 3 || req.files.length > 5) {
         throw new ApiError(400, "only 3 to 5 images required")
@@ -26,13 +33,15 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
         images.push(cloudinaryResponse.url)
     }
 
+    pickupAddress = JSON.parse(pickupAddress)
+
     const returnRequest = await returnModel.create({
         productId,
         userId,
         orderId,
         reason,
         pickupAddress,
-        toExchange,
+        toReplace,
         images
     })
 
@@ -53,6 +62,7 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
 
 const updateReturnRequest = catchAsyncError(async (req, res, next) => {
 
+    // return request id
     const { id } = req.params
 
     const { orderId, productId, status } = req.body
