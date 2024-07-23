@@ -123,25 +123,27 @@ const editUserProfile = catchAsyncError(async (req, res, next) => {
 // only for avatar
 const changeUserAvatar = catchAsyncError(async (req, res, next) => {
 
-    console.log(req.file);
-
     if (!req.file) {
         throw new ApiError(400, "provide an avatar")
     }
-    const cloudinaryResponse = await uploadOnCloudinary(req.file.newAvatar.path)
 
+    // upload the provided image to cloudinary
+    const cloudinaryResponse = await uploadOnCloudinary(req.file.path)
+
+    // take the user
     const user = await userModel.findById(req.user.id)
 
+    // delete old avatar of the user
     await deleteFromCloudinary(user.avatar.public_id)
 
+    // update the new avatar
     user.avatar = {
         url: cloudinaryResponse.url,
         public_id: cloudinaryResponse.public_id
     }
 
+    // save the updated user
     await user.save()
-
-    console.log(user);
 
     res.status(200).json({
         success: true,

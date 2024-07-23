@@ -16,6 +16,6 @@ router.route('/edit-review/:id').put(editReview)
 router.route('/add-review/:id').post(createReview)
 
 
-router.route('get-user-review/:id').get(fetchUserReview)
+router.route('/get-user-review/:id').get(fetchUserReview)
 
 export default router

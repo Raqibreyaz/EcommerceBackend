@@ -23,10 +23,9 @@ const verifyUser = (req, res, next) => {
 
     if (!user)
         return next(new ApiError(400, "user is not authenticated for this action"))
-
     req.user = user;
 
-    next()
+    return next()
 }
 
 const verifyAdmin = (req, res, next) => {
@@ -75,7 +74,7 @@ const verifyAdminOrOwner = async (req, res, next) => {
 
     req.user = user
 
-    next()
+    return next()
 }
 
 export {

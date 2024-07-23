@@ -167,7 +167,9 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 
     // const products = await productModel.find({}).limit(limit).skip((page - 1) * limit)
 
-    const { page = 1, limit = 10, category, min_discount, product_owners, min_price, max_price, rating, sort } = req.query;
+    let { page = 1, limit = 10, category, min_discount, product_owners, min_price, max_price, rating, sort } = req.query;
+
+    // limit = 2
 
     const pipeline = [];
 
@@ -204,11 +206,6 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
         matchStage.discount = { $gte: parseInt(min_discount) }
     }
 
-    // owner must be the id
-    // if (product_owners) {
-    //     matchStage.owner = mongoose.Types.ObjectId.createFromHexString(owner)
-    // }
-
     // if rating is given for filtering then filter by rating
     if (rating) {
         matchStage.rating = { $gte: parseInt(rating) };
@@ -237,7 +234,7 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
                 sortParams[sortParam] = order
             }
         }
-        console.log(sortParams); //{rating:-1,price:1}
+        //{rating:-1,price:1}
         pipeline.push({ $sort: sortParams });
     }
 
@@ -301,19 +298,16 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     // Execute the aggregation pipeline
     const result = await productModel.aggregate(pipeline)
 
-    // get all the products
-    const products = result[0].data;
-    const filteredTotal = result[0].metadata.length ? result[0].metadata[0].totalItems : 0;
-    const overallTotal = result[0].overallTotal.length ? result[0].overallTotal[0].count : 0;
+    let { data: products, metadata, overallTotal } = result
+
+    const filteredTotal = metadata.length ? metadata[0].totalItems : 0;
+    overallTotal = overallTotal.length ? overallTotal[0].count : 0;
 
     res.status(200).json({
         products,
         filteredTotal,
         overallTotal,
-        page: parseInt(page),
-        limit: parseInt(limit),
         totalPages: Math.ceil(filteredTotal / limit),
-        metaData: result[0].metadata
     });
 })
 

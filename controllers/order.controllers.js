@@ -374,38 +374,54 @@ const fetchOrders = catchAsyncError(async (req, res, next) => {
 
     const result = await orderModel.aggregate([
         {
-            $match: {
-                userId: mongoose.Types.ObjectId.createFromHexString(userId)
-            },
-        },
-        {
-            $sort: {
-                updatedAt: -1
-            }
-        },
-        {
-            $skip: (page - 1) * limit
-        },
-        {
-            $limit: limit
-        },
-        {
-            $project: {
-                totalAmount: 1,
-                createdAt: 1,
-                deliveryStatus: 1,
-                deliveredAt: 1,
-                "products.image": 1,
-                "products.returnStatus": 1,
-                "products.product": 1
+            $facet: {
+                data: [
+                    {
+                        $match: {
+                            userId: mongoose.Types.ObjectId.createFromHexString(userId)
+                        },
+                    },
+                    {
+                        $sort: {
+                            updatedAt: -1
+                        }
+                    },
+                    {
+                        $skip: (parseInt(page) - 1) * parseInt(limit)
+                    },
+                    {
+                        $limit: limit
+                    },
+                    {
+                        $project: {
+                            totalAmount: 1,
+                            createdAt: 1,
+                            deliveryStatus: 1,
+                            deliveredAt: 1,
+                            "products.image": 1,
+                            "products.returnStatus": 1,
+                            "products.product": 1
+                        }
+                    }
+                ],
+                metadata: [
+                    { $count: 'totalItems' }
+                ],
             }
         }
+
     ])
+
+    const { data: orders, metadata } = result[0]
+
+    const filteredTotal = metadata.length ? metadata[0].totalItems : 0
+    const totalPages = Math.ceil(filteredTotal / limit)
 
     res.status(200).json({
         success: true,
         message: "orders fetched successfully",
-        orders: result
+        orders,
+        totalPages
     })
 
 }
@@ -463,38 +479,52 @@ const fetchAllOrders = catchAsyncError(async (req, res, next) => {
 
     const { page = 1, limit = 15 } = req.query
 
-    const orders = await orderModel.aggregate([
-        { $match: {} },
-        // take orders on top which are newly created and updated previously
-        { $sort: { createdAt: -1, updatedAt: 1 } },
-        { $skip: (page - 1) * limit },
-        { $limit: limit },
+    const result = await orderModel.aggregate([
         {
-            $lookup: {
-                from: "users",
-                localField: "userId",
-                foreignField: "_id",
-                as: 'customerDetails'
-            }
-        },
-        { $unwind: "$customerDetails" },
-        {
-            $project: {
-                deliveryStatus: 1,
-                customer_name: "$customerDetails.fullname",
-                totalAmount: 1,
-                noOfProducts: { $size: "$products" },
-                createdAt: 1,
-                _id: 1
+            $facet: {
+                data: [
+                    { $match: {} },
+                    // take orders on top which are newly created and updated previously
+                    { $sort: { createdAt: -1, updatedAt: 1 } },
+                    { $skip: (parseInt(page) - 1) * parseInt(limit) },
+                    { $limit: limit },
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "userId",
+                            foreignField: "_id",
+                            as: 'customerDetails'
+                        }
+                    },
+                    { $unwind: "$customerDetails" },
+                    {
+                        $project: {
+                            deliveryStatus: 1,
+                            customer_name: "$customerDetails.fullname",
+                            totalAmount: 1,
+                            noOfProducts: { $size: "$products" },
+                            createdAt: 1,
+                            _id: 1
+                        }
+                    }
+                ],
+                metadata: [
+                    { $count: 'totalItems' }
+                ],
             }
         }
     ])
 
+    const { data: orders, metadata } = result[0]
+
+    const filteredTotal = metadata.length ? metadata[0].totalItems : 0
+    const totalPages = Math.ceil(filteredTotal / limit)
 
     res.status(200).json({
         success: true,
         message: "orders fetched successfully",
-        orders
+        orders,
+        filteredTotal
     })
 }
 )

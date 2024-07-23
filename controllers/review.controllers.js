@@ -12,14 +12,12 @@ const createReview = catchAsyncError(async (req, res, next) => {
     const userId = req.user.id
     const productId = req.params.id
     const { oneWord, review, rating } = req.body
-
-    await reviewModel.create({
-        userId,
-        productId,
-        review,
-        rating,
-        oneWord
-    })
+    
+    await reviewModel.findOneAndUpdate(
+        { userId, productId },
+        { userId, productId, oneWord, rating, review },
+        { new: true, upsert: true }
+    )
 
     res.status(200).json({
         success: true,
@@ -54,7 +52,7 @@ const fetchReviews = catchAsyncError(async (req, res, next) => {
             $sort: { createdAt: -1, rating: -1 }
         },
         {
-            $skip: (page - 1) * limit
+            $skip: (parseInt(page) - 1) * parseInt(limit)
         },
         {
             $limit: limit
@@ -101,10 +99,13 @@ const fetchUserReview = catchAsyncError(async (req, res, next) => {
     if (!checker(req.params, {}, 1))
         throw new ApiError(400, "provide product id to fetch user review")
 
+
     const { id: userId } = req.user
     const { id: productId } = req.params
 
     const review = await reviewModel.findOne({ productId, userId })
+
+    console.log(review);
 
     res.status(200).json({
         success: true,

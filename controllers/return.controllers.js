@@ -76,12 +76,15 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
 
 const updateReturnRequest = catchAsyncError(async (req, res, next) => {
 
+    if (!checker({ ...req.body, ...req.params }, {}, 6))
+        throw new ApiError(400, "provide all necessary details update the return request")
+
     // return request id
     const { id } = req.params
 
-    const { orderId, productId, status } = req.body
+    const { orderId, productId, color, size, status } = req.body
 
-    const updatedReturnRequest = await returnModel.findByIdAndUpdate(
+    await returnModel.findByIdAndUpdate(
         id,
         { $set: { status } }
     );
@@ -89,6 +92,8 @@ const updateReturnRequest = catchAsyncError(async (req, res, next) => {
     req.order = {
         id: orderId,
         productId,
+        color,
+        size,
         status
     }
 
@@ -105,46 +110,68 @@ const fetchReturnRequests = catchAsyncError(async (req, res, next) => {
 
     const { page = 1, limit = 10 } = req.query
 
-    const returnRequests = await returnModel.aggregate([
-        { $match: {} },
-        { $sort: { createdAt: -1, updatedAt: 1 } },
-        { $skip: (page - 1) * limit },
-        { $limit: limit },
+    const result = await returnModel.aggregate([
         {
-            $lookup: {
-                from: "users",
-                localField: "userId",
-                foreignField: "_id",
-                as: 'customerDetails'
-            }
-        },
-        {
-            $lookup: {
-                from: "products",
-                localField: "productId",
-                foreignField: "_id",
-                as: 'productDetails'
-            }
-        },
-        { $unwind: "$productDetails" },
-        { $unwind: "$customerDetails" },
-        {},
-        {
-            $project: {
-                _id: 1,
-                customer_name: "customerDetails.fullname",
-                createdAt: 1,
-                status: 1,
-                product_name: "productDetails.product_name",
-                refundAmount: 1
+            $facet: {
+                data: [
+                    { $match: {} },
+                    // taking the newest first and which are updated previously
+                    { $sort: { createdAt: -1, updatedAt: 1 } },
+                    { $skip: (parseInt(page) - 1) * parseInt(limit) },
+                    { $limit: limit },
+                    {
+
+                        $lookup: {
+                            from: "users",
+                            localField: "userId",
+                            foreignField: "_id",
+                            as: 'customerDetails'
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: "products",
+                            localField: "productId",
+                            foreignField: "_id",
+                            as: 'productDetails'
+                        }
+                    },
+                    { $unwind: "$productDetails" },
+                    { $unwind: "$customerDetails" },
+                    {},
+                    {
+                        $project: {
+                            _id: 1,
+                            orderId: 1,
+                            customer_name: "customerDetails.fullname",
+                            createdAt: 1,
+                            status: 1,
+                            product_name: "productDetails.product_name",
+                            color: 1,
+                            size: 1,
+                            quantity: 1,
+                            refundAmount: 1
+                        }
+                    }
+                ],
+                metadata: [
+                    { $count: 'totalItems' }
+                ],
             }
         }
     ])
 
+    const { data: returnRequests, metadata } = result[0]
+
+    const filteredTotal = metadata.length ? metadata[0].totalItems : 0
+    const totalPages = Math.ceil(filteredTotal / limit)
+
     res.status(200).json({
         success: true,
         message: "return requests fetched successfully",
-        returnRequests
+        returnRequests,
+        filteredTotal,
+        totalPages
     })
 }
 )
