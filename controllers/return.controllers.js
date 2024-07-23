@@ -7,48 +7,62 @@ import { checker } from "../utils/objectAndArrayChecker.js";
 
 const createReturnRequest = catchAsyncError(async (req, res, next) => {
 
-    if (!checker({ ...req.body, ...req.params }, { toReplace: true }, 4))
+    if (!checker({ ...req.body, ...req.params }, { toReplace: true }, 7))
         throw new ApiError(400, "provide all details to create return request")
 
     const userId = req.user.id
 
     const orderId = req.params.id
 
-    const {
+    // productId will be the unique _id in the array of products in the order  
+    let {
         productId,
+        color,
+        size,
+        quantity,
+        refundAmount,
         reason,
         toReplace = false,
         pickupAddress
     } = req.body
 
-console.log(req.files);
+    console.log(req.body);
 
     if (req.files.length < 3 || req.files.length > 5) {
         throw new ApiError(400, "only 3 to 5 images required")
     }
 
+    // // take the image path upload it on cloudinary and push object {url,public_id} into images
     const images = []
-    for (const { path } of req.files.productReturnImages) {
+    for (const { path } of req.files) {
+        console.log(path);
         const cloudinaryResponse = await uploadOnCloudinary(path)
-        images.push(cloudinaryResponse.url)
+        images.push({ url: cloudinaryResponse.url, public_id: cloudinaryResponse.public_id })
     }
 
+    // // pickup address will be a json string parse it into json object
     pickupAddress = JSON.parse(pickupAddress)
 
-    const returnRequest = await returnModel.create({
+    await returnModel.create({
         productId,
+        color,
+        size,
         userId,
+        quantity,
+        refundAmount: refundAmount * quantity,
         orderId,
+        images,
         reason,
-        pickupAddress,
         toReplace,
-        images
+        pickupAddress,
     })
 
     req.order = {
         id: orderId,
         productId,
-        status: 'return pending'
+        color,
+        size,
+        status: 'pending'
     }
 
     await changeReturnStatus(req, res, next)

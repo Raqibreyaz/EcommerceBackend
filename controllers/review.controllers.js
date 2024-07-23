@@ -13,7 +13,7 @@ const createReview = catchAsyncError(async (req, res, next) => {
     const productId = req.params.id
     const { oneWord, review, rating } = req.body
 
-    const newReview = reviewModel.create({
+    await reviewModel.create({
         userId,
         productId,
         review,
@@ -96,6 +96,24 @@ const fetchReviews = catchAsyncError(async (req, res, next) => {
 
 })
 
+const fetchUserReview = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.params, {}, 1))
+        throw new ApiError(400, "provide product id to fetch user review")
+
+    const { id: userId } = req.user
+    const { id: productId } = req.params
+
+    const review = await reviewModel.findOne({ productId, userId })
+
+    res.status(200).json({
+        success: true,
+        message: "user review fetched successfully",
+        userReview: review ?? {}
+    })
+}
+)
+
 // edit review using review id
 const editReview = catchAsyncError(async (req, res, next) => {
 
@@ -138,5 +156,6 @@ const editReview = catchAsyncError(async (req, res, next) => {
 export {
     createReview,
     fetchReviews,
-    editReview
+    editReview,
+    fetchUserReview
 }

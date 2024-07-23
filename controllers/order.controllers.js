@@ -503,9 +503,10 @@ const changeReturnStatus = catchAsyncError(async (req, res, next) => {
     // this function will be accessed by another fucntion also for changing the status 
     // orderId and productId is required every time
 
-    const orderId = req.order.id
-    const productId = req.order.productId
-    const status = req.order.status
+    if (!checker(req.order, {}, 5))
+        throw new ApiError(400, "provide necessary details to change return status")
+
+    const { id: orderId, productId, color, size, status } = req.order
 
     const statusObj = {
         'pending': "return pending",
@@ -513,49 +514,17 @@ const changeReturnStatus = catchAsyncError(async (req, res, next) => {
         'rejected': 'return rejected'
     }
 
-
-    // const updatedOrder = await Order.findOneAndUpdate(
-    //     { _id: orderId, 'products.productId': productId },
-    //     { $set: { 'products.$.returnStatus': status } },
-    //     { new: true }
-    // );
-
-    const updatedOrder = await orderModel.aggregate([
+    // The $ positional operator is used to refer to the first array element that matches the query.
+    const result = await orderModel.updateOne(
         {
-            $match: {
-                _id: mongoose.Types.ObjectId(orderId)
-            }
+            _id: orderId,
+            'products.product': productId,
+            'products.color': color,
+            'products.size': size
         },
-        {
-            $unwind: "$products"
-        },
-        {
-            $match: {
-                "products.productId": mongoose.Types.ObjectId(productId)
-            }
-        },
-        {
-            $set: {
-                "products.returnStatus": statusObj[status]
-            }
-        },
-        {
-            $group: {
-                _id: "$_id",
-                products: { $push: "$products" },
-                otherFields: { $first: "$$ROOT" } // Include other fields from the root document
-            }
-        },
-        {
-            $replaceRoot: {
-                newRoot: {
-                    $mergeObjects: ["$otherFields", { products: "$products" }]
-                }
-            }
-        }
-    ]);
-
-    return;
+        { $set: { 'products.$.returnStatus': statusObj[status] } },
+    );
+    console.log(result);
 }
 )
 

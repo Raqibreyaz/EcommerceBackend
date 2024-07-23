@@ -2,7 +2,7 @@ import mongoose, { trusted } from "mongoose";
 import mongoosePaginate from "mongoose-paginate-v2";
 import { validate } from "uuid";
 
-const imageSchema = new mongoose.Schema({
+export const imageSchema = new mongoose.Schema({
     url: {
         type: String,
         required: true

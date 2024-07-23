@@ -1,11 +1,25 @@
 import mongoose from 'mongoose'
 import { validate } from 'uuid'
+import { imageSchema } from './product.models.js'
 
 const returnSchema = new mongoose.Schema({
-    // product id is the _id of the product in the products array
     productId: {
         type: mongoose.Schema.Types.ObjectId,
+        ref: 'product',
         required: true
+    },
+    color: {
+        type: String,
+        required: true
+    },
+    size: {
+        type: String,
+        required: true
+    },
+    quantity: {
+        type: Number,
+        required: true,
+        min: 1
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -22,8 +36,8 @@ const returnSchema = new mongoose.Schema({
         required: true
     },
     images: {
-        type: [String],
-        required: true,
+        // {url,public_id}
+        type: [imageSchema],
         validate: {
             validator: (images) => {
                 return images.length >= 3 && images.length <= 5

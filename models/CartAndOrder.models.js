@@ -83,8 +83,8 @@ const orderSchema = new mongoose.Schema({
             },
             returnStatus: {
                 type: String,
-                enum: ['return pending', 'return rejected', 'return approved', 'not_requested'],
-                default: 'not_requested',
+                enum: ['return pending', 'return rejected', 'return approved', 'not requested'],
+                default: 'not requested',
             }
         }
     ],
