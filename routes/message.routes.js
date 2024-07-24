@@ -1,8 +1,10 @@
 import express from "express"
-import { verifyAdmin } from "../middlewares/verifyUser.js"
+import { createMessage, fetchMessages } from "../controllers/message.controllers";
 
 const router = express.Router()
 
+router.route('/create-message').post(createMessage)
 
+router.route('/get-messages').get(fetchMessages)
 
 export default router;

@@ -4,6 +4,8 @@ import { changeReturnStatus } from "./order.controllers.js";
 import { uploadOnCloudinary } from '../utils/cloudinary.js'
 import returnModel from "../models/return.models.js";
 import { checker } from "../utils/objectAndArrayChecker.js";
+import mongoose from "mongoose";
+import productModel from "../models/product.models.js";
 
 const createReturnRequest = catchAsyncError(async (req, res, next) => {
 
@@ -31,6 +33,11 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
     if (req.files.length < 3 || req.files.length > 5) {
         throw new ApiError(400, "only 3 to 5 images required")
     }
+
+    const product = await productModel.findById(productId)
+
+    if (!product.isReturnable)
+        throw new ApiError(400, "product is not returnable, sorry!")
 
     // // take the image path upload it on cloudinary and push object {url,public_id} into images
     const images = []
@@ -118,7 +125,7 @@ const fetchReturnRequests = catchAsyncError(async (req, res, next) => {
                     // taking the newest first and which are updated previously
                     { $sort: { createdAt: -1, updatedAt: 1 } },
                     { $skip: (parseInt(page) - 1) * parseInt(limit) },
-                    { $limit: limit },
+                    { $limit: parseInt(limit) },
                     {
 
                         $lookup: {
@@ -138,17 +145,15 @@ const fetchReturnRequests = catchAsyncError(async (req, res, next) => {
                     },
                     { $unwind: "$productDetails" },
                     { $unwind: "$customerDetails" },
-                    {},
                     {
                         $project: {
                             _id: 1,
                             orderId: 1,
-                            customer_name: "customerDetails.fullname",
+                            customer_name: "$customerDetails.fullname",
                             createdAt: 1,
                             status: 1,
-                            product_name: "productDetails.product_name",
-                            color: 1,
-                            size: 1,
+                            product_name: "$productDetails.product_name",
+                            images: 1,
                             quantity: 1,
                             refundAmount: 1
                         }
@@ -166,6 +171,8 @@ const fetchReturnRequests = catchAsyncError(async (req, res, next) => {
     const filteredTotal = metadata.length ? metadata[0].totalItems : 0
     const totalPages = Math.ceil(filteredTotal / limit)
 
+    console.log(returnRequests);
+
     res.status(200).json({
         success: true,
         message: "return requests fetched successfully",
@@ -176,8 +183,69 @@ const fetchReturnRequests = catchAsyncError(async (req, res, next) => {
 }
 )
 
+const fetchReturnRequestDetails = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.params, {}, 1))
+        throw new ApiError(400, "please provide return request id to continue")
+
+    const returnDetails = await returnModel.aggregate([
+        {
+            $match: {
+                _id: mongoose.Types.ObjectId.createFromHexString(req.params.id)
+            }
+        },
+        {
+
+            $lookup: {
+                from: "users",
+                localField: "userId",
+                foreignField: "_id",
+                as: 'customerDetails'
+            }
+        },
+        {
+            $lookup: {
+                from: "products",
+                localField: "productId",
+                foreignField: "_id",
+                as: 'productDetails'
+            }
+        },
+        { $unwind: "$productDetails" },
+        { $unwind: "$customerDetails" },
+        {
+            $project: {
+                orderId: 1,
+                "customerDetails.avatar": 1,
+                "customerDetails.fullname": 1,
+                "customerDetails.phoneNo": 1,
+                "customerDetails.email": 1,
+                pickupAddress: 1,
+                createdAt: 1,
+                status: 1,
+                "productDetails.product_name": 1,
+                "productDetails.returnPolicy": 1,
+                "productDetails.isReturnable": 1,
+                images: 1,
+                quantity: 1,
+                refundAmount: 1,
+                toReplace: 1,
+                reason:1
+            }
+        }
+    ])
+
+    res.status(200).json({
+        success: true,
+        message: "return details fetched successfully",
+        returnDetails: returnDetails[0]
+    })
+}
+)
+
 export {
     createReturnRequest,
     updateReturnRequest,
-    fetchReturnRequests
+    fetchReturnRequests,
+    fetchReturnRequestDetails
 }

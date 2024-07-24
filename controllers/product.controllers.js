@@ -272,7 +272,11 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
                     }
                 }
             ],
+            // will count the documents which match the filter criteria
             metadata: [
+                {
+                    $match: matchStage
+                },
                 { $count: 'totalItems' }
             ],
             overallTotal: [
@@ -298,7 +302,7 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     // Execute the aggregation pipeline
     const result = await productModel.aggregate(pipeline)
 
-    let { data: products, metadata, overallTotal } = result
+    let { data: products, metadata, overallTotal } = result[0]
 
     const filteredTotal = metadata.length ? metadata[0].totalItems : 0;
     overallTotal = overallTotal.length ? overallTotal[0].count : 0;

@@ -62,7 +62,7 @@ const fetchDashBoard = catchAsyncError(async (req, res) => {
         {
             $group: {
                 _id: { $dayOfMonth: "$createdAt" },
-                totalSales: { $sum: "$totalAmount" }
+                totalSells: { $sum: "$totalAmount" }
             }
         },
         // sort in ascending order

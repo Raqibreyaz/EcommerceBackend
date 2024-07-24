@@ -12,7 +12,7 @@ const createReview = catchAsyncError(async (req, res, next) => {
     const userId = req.user.id
     const productId = req.params.id
     const { oneWord, review, rating } = req.body
-    
+
     await reviewModel.findOneAndUpdate(
         { userId, productId },
         { userId, productId, oneWord, rating, review },
@@ -29,6 +29,9 @@ const createReview = catchAsyncError(async (req, res, next) => {
 // fetch reviews through product id
 const fetchReviews = catchAsyncError(async (req, res, next) => {
 
+    // review stats
+    // 5 -->x% of 100%
+
     if (!checker(req.params, {}, 1))
         throw new ApiError(400, "please provide productId to get reviews")
 
@@ -43,53 +46,90 @@ const fetchReviews = catchAsyncError(async (req, res, next) => {
 
     // get all the reveiws of that product
     const result = await reviewModel.aggregate([
-        // take all the reviews which match the filter
         {
-            $match: matchFilter,
-        },
-        // sorting reviews based on rating and newest first
-        {
-            $sort: { createdAt: -1, rating: -1 }
-        },
-        {
-            $skip: (parseInt(page) - 1) * parseInt(limit)
-        },
-        {
-            $limit: limit
-        },
-        {
-            $lookup: {
-                from: 'users',
-                localField: "userId",
-                foreignField: "_id",
-                as: "reviewersDetails"
-            }
-        },
-        { $unwind: "$reviewersDetails" },
-        {
-            $addFields: {
-                user: {
-                    fullname: "$reviewersDetails.fullname",
-                    _id: "$reviewersDetails._id",
-                    avatar: "$reviewersDetails.avatar",
-                    address: {
-                        $arrayElemAt: ["$reviewersDetails.addresses", 0]
+            $facet: {
+                data: [
+                    // take all the reviews which match the filter
+                    {
+                        $match: matchFilter,
+                    },
+                    // sorting reviews based on rating and newest first
+                    {
+                        $sort: { createdAt: -1, rating: -1 }
+                    },
+                    {
+                        $skip: (parseInt(page) - 1) * parseInt(limit)
+                    },
+                    {
+                        $limit: parseInt(limit)
+                    },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: "userId",
+                            foreignField: "_id",
+                            as: "reviewersDetails"
+                        }
+                    },
+                    {
+                        $unwind: {
+                            path: "$reviewersDetails",
+                            preserveNullAndEmptyArrays: true
+                        }
+                    },
+                    {
+                        $addFields: {
+                            user: {
+                                fullname: "$reviewersDetails.fullname",
+                                _id: "$reviewersDetails._id",
+                                avatar: "$reviewersDetails.avatar",
+                                address: {
+                                    $arrayElemAt: ["$reviewersDetails.addresses", 0]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        $project: {
+                            productId: 0,
+                            reviewersDetails: 0,
+                            userId:0    
+                        }
                     }
-                }
-            }
-        },
-        {
-            $project: {
-                productId: 0,
-                reviewersDetails: 0
+                ],
+                // get the count of reviews which match the given filter
+                filteredTotal: [
+                    { $match: matchFilter },
+                    { $count: "count" }
+                ],
+                // an array where each object 
+                reviewStats: [
+                    { $match: matchFilter },
+                    // group documents by their rating
+                    {
+                        $group: {
+                            _id: "$rating",
+                            // a counter will be incremented by 1 each time for a document
+                            count: { $sum: 1 }
+                        }
+                    }
+                ],
             }
         }
+
     ])
+
+    let { data: productReviews, reviewStats, filteredTotal } = result[0]
+
+    filteredTotal = filteredTotal.length ? filteredTotal[0].count : 0
 
     res.status(200).json({
         success: true,
         message: "reviews fetched successfully",
-        reviews: result
+        productReviews,
+        reviewStats,
+        filteredTotal,
+        totalPages: Math.ceil(filteredTotal / limit)
     })
 
 })
@@ -115,48 +155,8 @@ const fetchUserReview = catchAsyncError(async (req, res, next) => {
 }
 )
 
-// edit review using review id
-const editReview = catchAsyncError(async (req, res, next) => {
-
-    if (!checker({ ...req.body, ...req.params }, {}, 4))
-        throw new ApiError(400, "please provide all necessary details")
-
-    const userId = req.user.id
-    const { oneWord, review, rating } = req.body
-    const reviewId = req.params.id
-
-    // find the review  in the user reviewed on that product
-    const result = await reviewModel.aggregate([
-        {
-            // take that particular review of that user
-            $match: {
-                userId: mongoose.Types.ObjectId.createFromHexString(userId),
-                _id: reviewId
-            }
-        },
-        {
-            $set: {
-                review,
-                rating,
-                oneWord
-            }
-        }
-    ])
-
-    // when the review does not belongs to the user or user not have reviewed yet
-    if (!result.length)
-        throw new ApiError(404, "user review not found")
-
-    res.status(200).json({
-        success: true,
-        message: "review updated successfully",
-    })
-}
-)
-
 export {
     createReview,
     fetchReviews,
-    editReview,
     fetchUserReview
 }

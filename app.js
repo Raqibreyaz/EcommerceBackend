@@ -6,6 +6,7 @@ import { errorMiddleWare } from './utils/ApiError.js'
 import cookieParser from 'cookie-parser';
 import userRouter from './routes/user.routes.js';
 import productRouter from './routes/product.routes.js';
+import dashboardRouter from './routes/dashboard.routes.js';
 
 config({ path: "./.env" })
 
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true }))
 
 app.use('/api/v1/users', userRouter)
 app.use('/api/v1/products', productRouter)
+app.use('/api/v1/dashboard',dashboardRouter)
 
 app.use(errorMiddleWare)
 export default app;

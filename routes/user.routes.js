@@ -19,12 +19,6 @@ router.route('/register')
 router.route('/addnew')
     .post(verifyAdmin, upload.single('avatar'), registerUser)
 
-router.route('/dashboard')
-    .get(verifyAdmin, fetchDashBoard)
-
-router.route('/get-sellers')
-    .get(verifyAdmin, fetchSellers)
-
 router.route('/login')
     .post(loginUser)
 

@@ -15,8 +15,9 @@ const messageSchema = new mongoose.Schema({
     description: {
         type: String,
         required: true,
-        minLength: [50, "description must be at least 50 characters"]
+        minLength: [50, "description must be at least 50 characters"],
+        maxLength:[200,"description must be undex 200 characters"]
     },
-},{timestamps:true})
+}, { timestamps: true })
 
-export default mongoose.model('message',messageSchema)
+export default mongoose.model('message', messageSchema)
