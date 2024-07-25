@@ -13,7 +13,7 @@ const messageSchema = new mongoose.Schema({
         maxLength: [100, "subject must under 100 characters"]
     },
     description: {
-        type: String,
+        type: String,           
         required: true,
         minLength: [50, "description must be at least 50 characters"],
         maxLength:[200,"description must be undex 200 characters"]

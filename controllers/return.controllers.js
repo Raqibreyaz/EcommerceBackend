@@ -7,6 +7,7 @@ import { checker } from "../utils/objectAndArrayChecker.js";
 import mongoose from "mongoose";
 import productModel from "../models/product.models.js";
 
+// takes the order id for creating return request
 const createReturnRequest = catchAsyncError(async (req, res, next) => {
 
     if (!checker({ ...req.body, ...req.params }, { toReplace: true }, 7))
@@ -28,8 +29,7 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
         pickupAddress
     } = req.body
 
-    console.log(req.body);
-
+    // check for images provided
     if (req.files.length < 3 || req.files.length > 5) {
         throw new ApiError(400, "only 3 to 5 images required")
     }
@@ -42,7 +42,6 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
     // // take the image path upload it on cloudinary and push object {url,public_id} into images
     const images = []
     for (const { path } of req.files) {
-        console.log(path);
         const cloudinaryResponse = await uploadOnCloudinary(path)
         images.push({ url: cloudinaryResponse.url, public_id: cloudinaryResponse.public_id })
     }
@@ -81,26 +80,28 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
 }
 )
 
+// only takes the status of return request
 const updateReturnRequest = catchAsyncError(async (req, res, next) => {
 
-    if (!checker({ ...req.body, ...req.params }, {}, 6))
+    if (!checker({ ...req.body, ...req.params }, {}, 2))
         throw new ApiError(400, "provide all necessary details update the return request")
 
     // return request id
     const { id } = req.params
 
-    const { orderId, productId, color, size, status } = req.body
+    const { status } = req.body
 
-    await returnModel.findByIdAndUpdate(
+    const updatedReturnRequest = await returnModel.findByIdAndUpdate(
         id,
-        { $set: { status } }
+        { $set: { status } },
+        { new: true }
     );
 
     req.order = {
-        id: orderId,
-        productId,
-        color,
-        size,
+        id: updatedReturnRequest.orderId,
+        productId: updatedReturnRequest.productId,
+        color: updatedReturnRequest.color,
+        size: updatedReturnRequest.size,
         status
     }
 
@@ -171,8 +172,6 @@ const fetchReturnRequests = catchAsyncError(async (req, res, next) => {
     const filteredTotal = metadata.length ? metadata[0].totalItems : 0
     const totalPages = Math.ceil(filteredTotal / limit)
 
-    console.log(returnRequests);
-
     res.status(200).json({
         success: true,
         message: "return requests fetched successfully",
@@ -230,7 +229,7 @@ const fetchReturnRequestDetails = catchAsyncError(async (req, res, next) => {
                 quantity: 1,
                 refundAmount: 1,
                 toReplace: 1,
-                reason:1
+                reason: 1
             }
         }
     ])

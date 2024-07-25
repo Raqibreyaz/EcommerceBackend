@@ -266,8 +266,6 @@ const verifyRazorPayPayment = catchAsyncError(async (req, res, next) => {
 
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-    console.log(req.body);
-
     // Verify payment signature (implementation of verifyRazorpaySignature not shown)
     const isPaymentValid = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
 
@@ -390,7 +388,7 @@ const fetchOrders = catchAsyncError(async (req, res, next) => {
                         $skip: (parseInt(page) - 1) * parseInt(limit)
                     },
                     {
-                        $limit: limit
+                        $limit: parseInt(limit)
                     },
                     {
                         $project: {
@@ -421,7 +419,8 @@ const fetchOrders = catchAsyncError(async (req, res, next) => {
         success: true,
         message: "orders fetched successfully",
         orders,
-        totalPages
+        totalPages,
+        filteredTotal
     })
 
 }
@@ -554,7 +553,6 @@ const changeReturnStatus = catchAsyncError(async (req, res, next) => {
         },
         { $set: { 'products.$.returnStatus': statusObj[status] } },
     );
-    console.log(result);
 }
 )
 

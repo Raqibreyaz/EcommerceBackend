@@ -78,8 +78,7 @@ const userSchema = new mongoose.Schema({
             message: "address is required"
         }
     },
-
-})
+}, { timestamps: true })
 
 userSchema.pre('save', async function (next) {
     if (this.isModified('password')) {

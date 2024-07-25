@@ -145,8 +145,6 @@ const fetchUserReview = catchAsyncError(async (req, res, next) => {
 
     const review = await reviewModel.findOne({ productId, userId })
 
-    console.log(review);
-
     res.status(200).json({
         success: true,
         message: "user review fetched successfully",

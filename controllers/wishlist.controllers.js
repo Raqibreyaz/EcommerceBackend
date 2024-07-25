@@ -145,7 +145,6 @@ const fetchWishlist = catchAsyncError(async (req, res, next) => {
                 product_name: product.product_name,
                 price: product.price,
                 discount: product.discount,
-                description: product.description,
                 image,
                 productId: wishlistProduct.productId,
                 size: wishlistProduct.size,

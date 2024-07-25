@@ -9,7 +9,7 @@ import mongoose from 'mongoose'
 
 const registerUser = catchAsyncError(async (req, res, next) => {
 
-    if (!checker({ ...req.body, avatar: req.file }, { role }))
+    if (!checker({ ...req.body, avatar: req.file }, { role: true }, 6))
         throw new ApiError(400, "please provide full details")
 
     let { fullname, email, password, phoneNo, address, role = 'customer' } = req.body
@@ -18,7 +18,7 @@ const registerUser = catchAsyncError(async (req, res, next) => {
 
     address = JSON.parse(address)
 
-    if (checker(address))
+    if (!checker(address, {}, 4))
         throw new ApiError(400, "address is required!!")
 
     if (await userModel.findOne({ email }))
@@ -276,12 +276,26 @@ const fetchProfileDetails = catchAsyncError(async (req, res, next) => {
 
 const fetchSellers = catchAsyncError(async (req, res) => {
 
-    const sellers = await userModel.findOne({ role: 'seller' }).select('+fullname +avatar +phoneNo +email')
+    // const sellers = await userModel.findOne({ role: 'seller' }).select('+fullname +avatar +phoneNo +email +address')
+
+    const sellers = await userModel.aggregate([
+        { $match: { role: 'seller' } },
+        {
+            $project: {
+                fullname: 1,
+                email: 1,
+                avatar: 1,
+                address: { $arrayElemAt: ['$addresses', 0] },
+                phoneNo: 1,
+                joinedAt:"$createdAt"
+            }
+        }
+    ])
 
     res.status(200).json({
         success: true,
         message: "sellers fetched successfully",
-        sellers
+        sellers: sellers ? sellers : []
     })
 }
 )

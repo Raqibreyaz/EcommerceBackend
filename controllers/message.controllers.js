@@ -1,7 +1,7 @@
 import { catchAsyncError } from '../utils/catchAsyncError.js'
 import { checker } from '../utils/objectAndArrayChecker.js'
 import { ApiError } from '../utils/ApiError.js'
-import messageModel from '../models/message.models'
+import messageModel from '../models/message.models.js'
 
 const createMessage = catchAsyncError(async (req, res, next) => {
 
@@ -17,7 +17,7 @@ const createMessage = catchAsyncError(async (req, res, next) => {
 
     res.status(200).json({
         success: true,
-        message: 'message created sucessfullyF'
+        message: 'message created sucessfully'
     })
 }
 )
@@ -53,29 +53,31 @@ const fetchMessages = catchAsyncError(async (req, res, next) => {
                             "userDetails.phoneNo": 1,
                             "userDetails.avatar": 1,
                             'userDetails.address': { $arrayElemAt: ["$userDetails.addresses", 0] },
-                            "userDetails.role": 1
+                            "userDetails.role": 1,
+                            createdAt: 1    
                         }
                     }
                 ],
-                messageCount: [{ $count: 'totalMessages' }]
+                messageCount: [{ $count: 'filteredTotal' }]
             }
         }
     ])
 
     const { data: messages, messageCount } = result[0]
 
-    const totalMessages = messageCount.length ? messageCount[0].totalMessages : 0
+    const filteredTotal = messageCount.length ? messageCount[0].filteredTotal : 0
 
     res.status(200).json({
         success: true,
         message: "messages fetched successfully",
         messages,
-        totalMessages
+        filteredTotal,
+        totalPages: Math.ceil(filteredTotal / limit)
     })
 }
 )
 
-export  {
+export {
     createMessage,
     fetchMessages
 }
