@@ -135,10 +135,6 @@ const productSchema = new mongoose.Schema({
         required: true,
         minLength: [10, "details must be at least of 10 characters"]
     },
-    reviews: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'review'
-    }],
 },
     { timestamps: true })
 

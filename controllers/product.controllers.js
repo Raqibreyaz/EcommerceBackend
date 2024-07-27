@@ -12,147 +12,111 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
 
     // taking all the provided text data
     let {
-        product_name,
-        price,
-        isReturnable = true, //can be a string
-        returnPolicy,
-        totalStocks,
-        discount,
-        description,
-        category,
+        isReturnable,
         keyHighlights, //array of  highlight
         colors, //just an array of colors
         sizes, //array of sizes
-        details,
-        stocks,
+        stocks,//array of stocks,
+        totalStocks,
+        price,
+        discount,
     } = req.body;
 
-    if (checker(req.body, { isReturnable, discount }, 11))
+    if (!checker(req.body, { isReturnable: true, discount: true }, 11))
         throw new ApiError(400, "provide full info of the product")
-
-    let productCategory = await categoryModel.findOne({ name: category.toLowerCase() })
-    if (!productCategory) {
-        throw new ApiError(404, "category does not exist")
-    }
 
     colors = JSON.parse(colors)
     keyHighlights = JSON.parse(keyHighlights)
     sizes = JSON.parse(sizes)
     stocks = JSON.parse(stocks)
+    totalStocks = parseInt(totalStocks)
+    price = parseInt(price)
+    discount = parseInt(discount)
 
     let arrayCheck = checkArrays({ colors, keyHighlights, sizes, stocks, images: req.files })
-    if (arrayCheck)
+    if (arrayCheck !== true)
         throw new ApiError(400, `${arrayCheck} are required!!`)
 
-    let colorsImages = {}
-    let thumbnailPath = ''
 
-    req.files.forEach(({ fieldname, path }) => {
+    let productCategory = await categoryModel.findOne({ name: req.body.category.toLowerCase() })
+    if (!productCategory) {
+        throw new ApiError(404, "category does not exist")
+    }
+
+
+    let thumbnailPath = ''
+    let newColors = Array.from({ length: colors.length }).fill({}) //O(n)
+    req.files.forEach(({ fieldname, path }) => { //O(n*4) as every color has 4 images
 
         const regex = /\[(\d+)\]/;
 
-        // extract the index from the fieldname
         const match = fieldname.match(regex)
-        let index = ''
-        console.log(match);
+
+        // when match exists means it is a normal image
         if (match) {
-            index = match[1]
-            console.log(index);
+            const index = parseInt(match[1])
+            newColors[index].color = colors[index]
 
-            (colorsImages[index] ??= []).push({
-                path,
-                is_main: fieldname.includes('.mainImage')
-            })
+            if (!newColors[index].images)
+                newColors[index].images = []
+            newColors[index].images
+                .push({ path, is_main: fieldname.includes('mainImage') })
+
         }
-        else
+        // when match not exists then it is a thumbnail
+        else {
             thumbnailPath = path
-    });
+        }
+    })
 
-    console.log('thumbnail-path', thumbnailPath);
+    let myColors = Array.from({ length: colors.length }).fill({})
+    for (let index = 0; index < newColors.length; index++) {
 
-    console.log('given image files ', colorsImages);
+        const { color, images } = newColors[index];
 
+        myColors[index].color = color
+
+        for (const { path, is_main } of images) {
+
+            let cloudinaryResponse = await uploadOnCloudinary(path)
+
+            if (!myColors[index].images)
+                myColors[index].images = []
+
+            myColors[index].images
+                .push({
+                    image: {
+                        url: cloudinaryResponse.url,
+                        public_id: cloudinaryResponse.public_id
+                    },
+                    is_main
+                })
+        }
+    }
     // upload the thumbnail
     let thumbnailResponse = await uploadOnCloudinary(thumbnailPath)
-
     // {url,public_id}
     let thumbnail = {
         url: thumbnailResponse.url,
         public_id: thumbnailResponse.public_id
     }
 
-    let newColorsImages = {}
-
-    // will populate the newColorsImages object
-    for (const index in colorsImages) {
-        if (Object.hasOwnProperty.call(colorsImages, index)) {
-            const ithColorImages = colorsImages[index];
-
-            let temp = []
-
-            // will give an array of images corresponding to that indexThColor
-            // {image:{url,public_id},is_main}
-            for (const image of ithColorImages) {
-                let cloudinaryResponse = await uploadOnCloudinary(image.path)
-
-                let imageObj = {
-                    image: {
-                        url: cloudinaryResponse.url,
-                        public_id: cloudinaryResponse.public_id
-                    },
-                    is_main: image.is_main
-                };
-
-                // inserting main image at the 0th index to get it at O(1)
-                if (image.is_main) {
-                    temp.unshift(imageObj)
-                }
-                else {
-                    temp.push(imageObj)
-                }
-            }
-
-            console.log(temp);
-
-            newColorsImages[index] = temp
-        }
-    }
-    // {0:[{image:{},is_main}],1:[]}
-
-    colors = colors.map((color, index) => (
-        {
-            color,
-            images: newColorsImages[index]
-        }
-    ))
-
-    // [{color,images}]
-
-    isReturnable = Boolean(isReturnable)
+    isReturnable = isReturnable ? Boolean(isReturnable) : true
 
     let owner = req.user.id
 
-    console.log(owner);
-    console.log(sizes);
-    console.log(stocks);
-    console.log(keyHighlights);
-
-    const product = await productModel.create({
-        product_name,
-        price,
+    await productModel.create({
+        ...req.body,
         isReturnable, //can be a string
-        returnPolicy,
-        totalStocks,
         thumbnail,
-        discount,
-        description,
-        category,
         keyHighlights,
         sizes,
         owner,
-        details,
         stocks,
-        colors
+        colors: myColors,
+        totalStocks,
+        price,
+        discount
     })
 
     res.status(200).json({
@@ -338,48 +302,7 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
             }
         },
         {
-            $lookup: {
-                from: "reviews",
-                localField: "reviews",
-                foreignField: "_id",
-                as: "productReviews"
-            }
-        },
-        {
-            $lookup: {
-                from: "users",
-                localField: "productReviews.userId",
-                foreignField: "_id",
-                as: "reviewers"
-            }
-        },
-        {
             $addFields: {
-                reviews: {
-                    $map: {
-                        input: "$productReviews",
-                        as: "review",
-                        in: {
-                            user: {
-                                $arrayElemAt: [
-                                    {
-                                        $filter: {
-                                            input: "$reviewers",
-                                            as: "reviewer",
-                                            cond: {
-                                                $eq: ["$$reviewer._id", "$$review.userId"]
-                                            }
-                                        }
-                                    },
-                                    0
-                                ]
-                            },
-                            oneWord: "$$review.oneWord",
-                            review: "$$review.review",
-                            rating: "$$review.rating"
-                        }
-                    }
-                },
                 owner: {
                     $arrayElemAt: [
                         {
@@ -414,15 +337,6 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
                 keyHighlights: 1,
                 owner: 1,
                 category: 1,
-                "reviews.oneWord": 1,
-                "reviews.rating": 1,
-                "reviews.review": 1,
-                "reviews.user.fullname": 1,
-                "reviews.user.avatar": 1,
-                "reviews.user._id": 1,
-                "reviews.user.address": {
-                    $arrayElemAt: ["$reviews.user.addresses", 0]
-                }
             }
         }
     ]);

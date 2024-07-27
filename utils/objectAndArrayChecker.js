@@ -10,8 +10,9 @@ function checker(object, excludes = {}, noOfKeys = 1) {
             if (!excludes[key] && !object[key])
                 return false
             // the key  is not an optional key and is present
-            else if (!excludes[key])
+            else if (!excludes[key]) {
                 requiredCounter++
+            }
         }
     }
 

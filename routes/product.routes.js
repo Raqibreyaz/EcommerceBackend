@@ -7,17 +7,6 @@ import reviewRouter from '../routes/review.routes.js'
 
 const router = express.Router()
 
-const fields = [
-    {
-        name: 'mainImage',
-        maxCount: 1,
-    },
-    {
-        name: 'images',
-        maxCount: 3
-    }
-]
-
 // http://localhost:3000/api/v1/products
 
 router.use('/category', categoryRouter)
