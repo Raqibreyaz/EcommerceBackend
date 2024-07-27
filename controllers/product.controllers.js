@@ -348,215 +348,246 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 }
 )
 
+// const editProduct = catchAsyncError(async (req, res, next) => {
+
+//     if (!checker({ ...req.body, ...req.params }, { isReturnable, discount }, 13))
+//         throw new ApiError(400, "provide necessary details to update product")
+
+//     let {
+//         product_name,
+//         price,
+//         discount,
+//         description,
+//         category,
+//         sizes,
+//         details,
+//         keyHighlights,
+//         stocks,
+//         oldColors,
+//         newColors,
+//         isReturnable,
+//         returnPolicy,
+//         totalStocks,
+//     } = req.body
+
+//     const productId = req.params.id
+
+//     sizes = JSON.parse(sizes)
+//     keyHighlights = JSON.parse(keyHighlights)
+//     oldColors = JSON.parse(oldColors)
+//     newColors = JSON.parse(newColors)
+//     stocks = JSON.parse(stocks)
+
+//     // take all the files of new colors
+//     // take all the files which are to be inserted
+//     // completely remove all images of a color if it is deleted
+//     // when new thumbnail is provided then delete old thumbnail
+//     // newMainImage[] , toBeInserted[],newThumbnail , newColors[] ,newColor[].mainImage
+
+//     let toBeDeleted = []
+//     let newThumbnail = ''
+//     const oldProduct = await productModel.findById(productId)
+
+//     // when new files are provided then upload on cloud and store 
+//     for (let i = 0; i < req.files.length; i++) {
+
+//         const { fieldname, path } = req.files[i];
+
+//         const cloudinaryResponse = await uploadOnCloudinary(path)
+
+//         const regex = /\[(\d+)\]/;
+
+//         const match = fieldname.match(regex)
+
+//         let index = ''
+
+//         console.log(match);
+
+//         if (match)
+//             index = parseInt(match[1])
+
+//         // when index not found new thumbnail is provided
+//         if (!index && fieldname.includes('newThumbnail')) {
+//             newThumbnail = {
+//                 url: cloudinaryResponse.url,
+//                 public_id: cloudinaryResponse.public_id
+//             }
+//             toBeDeleted.push(oldProduct.thumbnail.public_id)
+//         }
+//         // when new colors are available
+//         else if (fieldname.includes('newColors')) {
+//             // newColors[idnex]='red' --> {color:'red',images:[{image:{},is_main}]}
+//             const imageObj = {
+//                 image: {
+//                     url: cloudinaryResponse.url,
+//                     public_id: cloudinaryResponse.public_id
+//                 },
+//                 is_main: fieldname.includes('.mainImage')
+//             }
+
+//             if (typeof newColors[index] === 'object') {
+
+//                 // insert main image at the 0th index for T.C. O(1)
+//                 if (imageObj.is_main) {
+//                     newColors[index].images.unshift(imageObj)
+//                 }
+//                 else
+//                     newColors[index].images.push(imageObj)
+//             }
+//             else {
+//                 const tempObj = {
+//                     color: newColors[index],
+//                     images: [imageObj],
+//                 }
+
+//                 newColors[index] = tempObj
+//             }
+//         }
+//         // when old colors have changes
+//         else {
+//             // toBeInserted[] , newMainImage[]
+//             // oldColors[{color,images,mainImage,toBeDeleted,colorId}]
+
+//             let isMain = false
+
+//             // when there is a new mainImage then remove old mainImage
+//             if (fieldname.includes('newMainImage')) {
+//                 isMain = true,
+//                     toBeDeleted.push(oldColors[index].mainImage.image.public_id)
+
+//                 // by doing this we ensure that when a oldMainImage exist then it means the color hasnt any main image
+//                 oldColors[index].mainImage = null
+//             }
+
+//             let imageObj = {
+//                 image: {
+//                     url: cloudinaryResponse.url,
+//                     public_id: cloudinaryResponse.public_id
+//                 },
+//                 is_main: isMain
+//             }
+
+//             // insert main image at the 0th index for T.C. O(1)
+//             if (isMain) {
+//                 oldColors[index].images.unshift(imageObj)
+//             }
+//             else {
+//                 oldColors[index].images.push(imageObj)
+//             }
+
+//         }
+//     }
+
+//     // deleting images of removed colors
+//     for (const { _id, images } of oldProduct.colors) {
+
+//         let oldColorId = _id.toString()
+//         let check = false
+
+//         // checking if the oldColorId matches with updated colors id
+//         for (let { colorId } of oldColors) {
+//             if (colorId === oldColorId) {
+//                 check = true
+//                 break
+//             }
+//         }
+
+//         // when the color is deleted then pick its images for deletion
+//         if (!check) {
+//             let publicIds = images.map(({ image }) => image.public_id)
+//             toBeDeleted = [...toBeDeleted, ...publicIds]
+//         }
+//     }
+
+//     // add mainImages to their respective colors
+//     oldColors = oldColors.map(({ color, images, mainImage, toBeDeleted: removedImages }) => {
+
+//         // take images which have to be deleted from that color
+//         toBeDeleted = [...toBeDeleted, ...removedImages]
+
+//         // when mainImage exists it means we have to include it in images at 0 index 
+//         // when no mainImage exist then it is already set , just return
+//         return mainImage ? { color, images: [mainImage, ...images] } : { color, images }
+//     })
+
+//     // handled oldColors
+//     // handled newColors
+//     // handles mainImages
+//     // handled removed colors
+//     // handled newThumbnail
+
+//     console.log('old colors ', oldColors);
+//     console.log('new colors ', newColors);
+
+//     const newUpdatedColors = [...oldColors, ...newColors]
+
+//     console.log('new updated colors ', newUpdatedColors);
+
+//     let newProduct = {
+//         product_name,
+//         price,
+//         discount,
+//         description,
+//         category,
+//         sizes,
+//         details,
+//         keyHighlights,
+//         stocks,
+//         isReturnable,
+//         returnPolicy,
+//         totalStocks,
+//         colors: newUpdatedColors
+//     }
+
+//     console.log('new product ', newProduct);
+
+//     // when theres a new thumbnail then take it
+//     if (newThumbnail)
+//         newProduct.thumbnail = newThumbnail
+
+//     let updatedProduct = await productModel.findByIdAndUpdate(
+//         productId,
+//         // only change the given fields
+//         { $set: newProduct },
+//         { new: true }
+//     )
+
+//     // finally deleting the given images
+//     for (const public_id of toBeDeleted) {
+//         let deleteResponse = await deleteFromCloudinary(public_id)
+//         console.log('delete response ', deleteResponse);
+//     }
+
+//     res.status(200).json({
+//         success: true,
+//         message: "product updated successfully"
+//     })
+// }
+// )
+
+// delete all reviews 
+// delete all images including thumbnail and of colors
+
 const editProduct = catchAsyncError(async (req, res, next) => {
 
-    if (!checker({ ...req.body, ...req.params }, { isReturnable, discount }, 13))
-        throw new ApiError(400, "provide necessary details to update product")
+    if (!checker({ ...req.body, ...req.params }, {}, 1))
+        throw new ApiError(400, "provide something to update")
 
-    let {
-        product_name,
-        price,
-        discount,
-        description,
-        category,
-        sizes,
-        details,
-        keyHighlights,
-        stocks,
-        oldColors,
-        newColors,
-        isReturnable,
-        returnPolicy,
-        totalStocks,
-    } = req.body
+    let { sizes, keyHighlights, stocks } = req.body
 
-    const productId = req.params.id
+    const toUpdate = { ...req.body }
 
-    sizes = JSON.parse(sizes)
-    keyHighlights = JSON.parse(keyHighlights)
-    oldColors = JSON.parse(oldColors)
-    newColors = JSON.parse(newColors)
-    stocks = JSON.parse(stocks)
-
-    // take all the files of new colors
-    // take all the files which are to be inserted
-    // completely remove all images of a color if it is deleted
-    // when new thumbnail is provided then delete old thumbnail
-    // newMainImage[] , toBeInserted[],newThumbnail , newColors[] ,newColor[].mainImage
-
-    let toBeDeleted = []
-    let newThumbnail = ''
-    const oldProduct = await productModel.findById(productId)
-
-    // when new files are provided then upload on cloud and store 
-    for (let i = 0; i < req.files.length; i++) {
-
-        const { fieldname, path } = req.files[i];
-
-        const cloudinaryResponse = await uploadOnCloudinary(path)
-
-        const regex = /\[(\d+)\]/;
-
-        const match = fieldname.match(regex)
-
-        let index = ''
-
-        console.log(match);
-
-        if (match)
-            index = parseInt(match[1])
-
-        // when index not found new thumbnail is provided
-        if (!index && fieldname.includes('newThumbnail')) {
-            newThumbnail = {
-                url: cloudinaryResponse.url,
-                public_id: cloudinaryResponse.public_id
-            }
-            toBeDeleted.push(oldProduct.thumbnail.public_id)
-        }
-        // when new colors are available
-        else if (fieldname.includes('newColors')) {
-            // newColors[idnex]='red' --> {color:'red',images:[{image:{},is_main}]}
-            const imageObj = {
-                image: {
-                    url: cloudinaryResponse.url,
-                    public_id: cloudinaryResponse.public_id
-                },
-                is_main: fieldname.includes('.mainImage')
-            }
-
-            if (typeof newColors[index] === 'object') {
-
-                // insert main image at the 0th index for T.C. O(1)
-                if (imageObj.is_main) {
-                    newColors[index].images.unshift(imageObj)
-                }
-                else
-                    newColors[index].images.push(imageObj)
-            }
-            else {
-                const tempObj = {
-                    color: newColors[index],
-                    images: [imageObj],
-                }
-
-                newColors[index] = tempObj
-            }
-        }
-        // when old colors have changes
-        else {
-            // toBeInserted[] , newMainImage[]
-            // oldColors[{color,images,mainImage,toBeDeleted,colorId}]
-
-            let isMain = false
-
-            // when there is a new mainImage then remove old mainImage
-            if (fieldname.includes('newMainImage')) {
-                isMain = true,
-                    toBeDeleted.push(oldColors[index].mainImage.image.public_id)
-
-                // by doing this we ensure that when a oldMainImage exist then it means the color hasnt any main image
-                oldColors[index].mainImage = null
-            }
-
-            let imageObj = {
-                image: {
-                    url: cloudinaryResponse.url,
-                    public_id: cloudinaryResponse.public_id
-                },
-                is_main: isMain
-            }
-
-            // insert main image at the 0th index for T.C. O(1)
-            if (isMain) {
-                oldColors[index].images.unshift(imageObj)
-            }
-            else {
-                oldColors[index].images.push(imageObj)
-            }
-
-        }
+    if (sizes) {
+        toUpdate.sizes = JSON.parse(sizes)
+    }
+    if (keyHighlights) {
+        toUpdate.keyHighlights = JSON.parse(keyHighlights)
+    }
+    if (stocks) {
+        toUpdate.stocks = JSON.parse(stocks)
     }
 
-    // deleting images of removed colors
-    for (const { _id, images } of oldProduct.colors) {
-
-        let oldColorId = _id.toString()
-        let check = false
-
-        // checking if the oldColorId matches with updated colors id
-        for (let { colorId } of oldColors) {
-            if (colorId === oldColorId) {
-                check = true
-                break
-            }
-        }
-
-        // when the color is deleted then pick its images for deletion
-        if (!check) {
-            let publicIds = images.map(({ image }) => image.public_id)
-            toBeDeleted = [...toBeDeleted, ...publicIds]
-        }
-    }
-
-    // add mainImages to their respective colors
-    oldColors = oldColors.map(({ color, images, mainImage, toBeDeleted: removedImages }) => {
-
-        // take images which have to be deleted from that color
-        toBeDeleted = [...toBeDeleted, ...removedImages]
-
-        // when mainImage exists it means we have to include it in images at 0 index 
-        // when no mainImage exist then it is already set , just return
-        return mainImage ? { color, images: [mainImage, ...images] } : { color, images }
-    })
-
-    // handled oldColors
-    // handled newColors
-    // handles mainImages
-    // handled removed colors
-    // handled newThumbnail
-
-    console.log('old colors ', oldColors);
-    console.log('new colors ', newColors);
-
-    const newUpdatedColors = [...oldColors, ...newColors]
-
-    console.log('new updated colors ', newUpdatedColors);
-
-    let newProduct = {
-        product_name,
-        price,
-        discount,
-        description,
-        category,
-        sizes,
-        details,
-        keyHighlights,
-        stocks,
-        isReturnable,
-        returnPolicy,
-        totalStocks,
-        colors: newUpdatedColors
-    }
-
-    console.log('new product ', newProduct);
-
-    // when theres a new thumbnail then take it
-    if (newThumbnail)
-        newProduct.thumbnail = newThumbnail
-
-    let updatedProduct = await productModel.findByIdAndUpdate(
-        productId,
-        // only change the given fields
-        { $set: newProduct },
-        { new: true }
-    )
-
-    // finally deleting the given images
-    for (const public_id of toBeDeleted) {
-        let deleteResponse = await deleteFromCloudinary(public_id)
-        console.log('delete response ', deleteResponse);
-    }
+    await productModel.findByIdAndUpdate(req.params.id, toUpdate)
 
     res.status(200).json({
         success: true,
@@ -565,8 +596,11 @@ const editProduct = catchAsyncError(async (req, res, next) => {
 }
 )
 
-// delete all reviews 
-// delete all images including thumbnail and of colors
+const editColorAndImages = catchAsyncError(async (req, res, next) => {
+
+}
+)
+
 const deleteProduct = catchAsyncError(async (req, res, next) => {
 
     let productId = req.params.id
@@ -612,5 +646,6 @@ export {
     fetchProducts,
     editProduct,
     deleteProduct,
-    fetchProductDetails
+    fetchProductDetails,
+    editColorAndImages
 }
