@@ -6,39 +6,28 @@ import categoryModel from '../models/category.models.js'
 import reviewModel from '../models/review.models.js'
 import { checkArrays, checker } from '../utils/objectAndArrayChecker.js'
 import mongoose from 'mongoose'
+import { converter } from '../utils/converter.js'
 
 // this function just adds a new product 
 const addNewProduct = catchAsyncError(async (req, res, next) => {
 
-    // taking all the provided text data
+    if (!checker(req.body, { isReturnable: true, discount: true }, 11))
+        throw new ApiError(400, "provide full info of the product")
+
+    const toCreate = converter(req.body, true, { isReturnable: true, discount: 0 })
+
     let {
-        isReturnable,
         keyHighlights, //array of  highlight
         colors, //just an array of colors
         sizes, //array of sizes
         stocks,//array of stocks,
-        totalStocks,
-        price,
-        discount,
-    } = req.body;
-
-    if (!checker(req.body, { isReturnable: true, discount: true }, 11))
-        throw new ApiError(400, "provide full info of the product")
-
-    colors = JSON.parse(colors)
-    keyHighlights = JSON.parse(keyHighlights)
-    sizes = JSON.parse(sizes)
-    stocks = JSON.parse(stocks)
-    totalStocks = parseInt(totalStocks)
-    price = parseInt(price)
-    discount = parseInt(discount)
+    } = toCreate;
 
     let arrayCheck = checkArrays({ colors, keyHighlights, sizes, stocks, images: req.files })
     if (arrayCheck !== true)
         throw new ApiError(400, `${arrayCheck} are required!!`)
 
-
-    let productCategory = await categoryModel.findOne({ name: req.body.category.toLowerCase() })
+    let productCategory = await categoryModel.findOne({ name: toCreate.category.toLowerCase() })
     if (!productCategory) {
         throw new ApiError(404, "category does not exist")
     }
@@ -101,22 +90,13 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         public_id: thumbnailResponse.public_id
     }
 
-    isReturnable = isReturnable ? Boolean(isReturnable) : true
-
     let owner = req.user.id
 
     await productModel.create({
-        ...req.body,
-        isReturnable, //can be a string
+        ...toCreate,
         thumbnail,
-        keyHighlights,
-        sizes,
         owner,
-        stocks,
         colors: myColors,
-        totalStocks,
-        price,
-        discount
     })
 
     res.status(200).json({
@@ -131,7 +111,7 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 
     // const products = await productModel.find({}).limit(limit).skip((page - 1) * limit)
 
-    let { page = 1, limit = 10, category, min_discount, product_owners, min_price, max_price, rating, sort } = req.query;
+    let { page = 1, limit = 10, category, min_discount, product_owners, min_price, max_price, rating, sort } = converter(req.query);
 
     // limit = 2
 
@@ -157,22 +137,18 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
 
     // if price is given for filtering then filter by price
     if (min_price) {
-        const obj = {
-            $gte: parseInt(min_price)
-        }
-        if (max_price) {
-            obj.$lte = parseInt(max_price)
-        }
+        const obj = { $gte: min_price }
+        if (max_price) obj.$lte = max_price
         matchStage.price = obj;
     }
 
     if (min_discount) {
-        matchStage.discount = { $gte: parseInt(min_discount) }
+        matchStage.discount = { $gte: min_discount }
     }
 
     // if rating is given for filtering then filter by rating
     if (rating) {
-        matchStage.rating = { $gte: parseInt(rating) };
+        matchStage.rating = { $gte: rating };
     }
 
     // filter out the documents having no stocks
@@ -191,15 +167,8 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     pipeline.push({ $match: matchStage })
 
     if (sort) {
-        const sortParams = {}
-        for (const sortParam in sort) {
-            if (Object.hasOwnProperty.call(sort, sortParam)) {
-                const order = parseInt(sort[sortParam]);
-                sortParams[sortParam] = order
-            }
-        }
         //{rating:-1,price:1}
-        pipeline.push({ $sort: sortParams });
+        pipeline.push({ $sort: converter(sort, false, { rating: -1, price: 1 }) });
     }
 
     pipeline.push({
@@ -207,9 +176,9 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
         $facet: {
             data: [
                 // will skip previous products --> for 11 to 20 , skip 1 to 10
-                { $skip: (parseInt(page) - 1) * parseInt(limit) },
+                { $skip: (page - 1) * limit },
                 // only take 10 products
-                { $limit: parseInt(limit) },
+                { $limit: limit },
                 {
                     $lookup: {
                         from: 'users',
@@ -570,24 +539,15 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 
 const editProduct = catchAsyncError(async (req, res, next) => {
 
-    if (!checker({ ...req.body, ...req.params }, {}, 1))
+    // price,discount,totalStocks,sizes,keyHighlights,stocks
+
+    if (!req.params.id)
+        throw new ApiError(400, "provide product id to update product")
+
+    if (!checker(req.body, {}, 1))
         throw new ApiError(400, "provide something to update")
 
-    let { sizes, keyHighlights, stocks } = req.body
-
-    const toUpdate = { ...req.body }
-
-    if (sizes) {
-        toUpdate.sizes = JSON.parse(sizes)
-    }
-    if (keyHighlights) {
-        toUpdate.keyHighlights = JSON.parse(keyHighlights)
-    }
-    if (stocks) {
-        toUpdate.stocks = JSON.parse(stocks)
-    }
-
-    await productModel.findByIdAndUpdate(req.params.id, toUpdate)
+    await productModel.findByIdAndUpdate(req.params.id, { $set: converter(req.body, false, { isReturnable: true }) })
 
     res.status(200).json({
         success: true,

@@ -287,7 +287,7 @@ const fetchSellers = catchAsyncError(async (req, res) => {
                 avatar: 1,
                 address: { $arrayElemAt: ['$addresses', 0] },
                 phoneNo: 1,
-                joinedAt:"$createdAt"
+                joinedAt: "$createdAt"
             }
         }
     ])
@@ -300,6 +300,37 @@ const fetchSellers = catchAsyncError(async (req, res) => {
 }
 )
 
+const findUser = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.body, {}, 1))
+        throw new ApiError(400, "provide an email to find user")
+
+    const user = await userModel.findOne({ email: req.body.email }).select("fullname role email")
+
+    if (!user)
+        throw new ApiError(400, "user does not exist")
+
+    res.status(200).json({
+        success: true,
+        message: "user found",
+        user
+    })
+}
+)
+
+const changeUserRole = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.body, {}, 2))
+        throw new ApiError(400, "provide necessary details to change role")
+
+    await userModel.findOneAndUpdate({ email: req.body.email }, { role: req.body.role })
+
+    res.status(200).json({
+        success: true,
+        message: "user role updated successfully"
+    })
+}
+)
 
 export {
     registerUser,
@@ -312,5 +343,7 @@ export {
     fetchProductOwners,
     fetchProfileDetails,
     removeAddress,
-    fetchSellers
+    fetchSellers,
+    findUser,
+    changeUserRole
 }
