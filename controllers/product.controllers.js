@@ -7,6 +7,7 @@ import reviewModel from '../models/review.models.js'
 import { checkArrays, checker } from '../utils/objectAndArrayChecker.js'
 import mongoose from 'mongoose'
 import { converter } from '../utils/converter.js'
+import { uploadAndStore } from '../utils/uploadAndStore.js'
 
 // this function just adds a new product 
 const addNewProduct = catchAsyncError(async (req, res, next) => {
@@ -32,63 +33,11 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         throw new ApiError(404, "category does not exist")
     }
 
+    // newImages:{0:[{image:{url,public_id},is_main:boolean}]}]
+    const [newImages, thumbnail] = uploadAndStore(req.files)
 
-    let thumbnailPath = ''
-    let newColors = Array.from({ length: colors.length }).fill({}) //O(n)
-    req.files.forEach(({ fieldname, path }) => { //O(n*4) as every color has 4 images
-
-        const regex = /\[(\d+)\]/;
-
-        const match = fieldname.match(regex)
-
-        // when match exists means it is a normal image
-        if (match) {
-            const index = parseInt(match[1])
-            newColors[index].color = colors[index]
-
-            if (!newColors[index].images)
-                newColors[index].images = []
-            newColors[index].images
-                .push({ path, is_main: fieldname.includes('mainImage') })
-
-        }
-        // when match not exists then it is a thumbnail
-        else {
-            thumbnailPath = path
-        }
-    })
-
-    let myColors = Array.from({ length: colors.length }).fill({})
-    for (let index = 0; index < newColors.length; index++) {
-
-        const { color, images } = newColors[index];
-
-        myColors[index].color = color
-
-        for (const { path, is_main } of images) {
-
-            let cloudinaryResponse = await uploadOnCloudinary(path)
-
-            if (!myColors[index].images)
-                myColors[index].images = []
-
-            myColors[index].images
-                .push({
-                    image: {
-                        url: cloudinaryResponse.url,
-                        public_id: cloudinaryResponse.public_id
-                    },
-                    is_main
-                })
-        }
-    }
-    // upload the thumbnail
-    let thumbnailResponse = await uploadOnCloudinary(thumbnailPath)
-    // {url,public_id}
-    let thumbnail = {
-        url: thumbnailResponse.url,
-        public_id: thumbnailResponse.public_id
-    }
+    // newColors:[{color:'',images:[{}]}]
+    const newColors = integrateImages(colors, newImages)
 
     let owner = req.user.id
 
@@ -96,7 +45,7 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
         ...toCreate,
         thumbnail,
         owner,
-        colors: myColors,
+        colors: newColors,
     })
 
     res.status(200).json({
@@ -306,6 +255,7 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
                 keyHighlights: 1,
                 owner: 1,
                 category: 1,
+                thumbnail: 1
             }
         }
     ]);
@@ -534,9 +484,6 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 // }
 // )
 
-// delete all reviews 
-// delete all images including thumbnail and of colors
-
 const editProduct = catchAsyncError(async (req, res, next) => {
 
     // price,discount,totalStocks,sizes,keyHighlights,stocks
@@ -558,6 +505,151 @@ const editProduct = catchAsyncError(async (req, res, next) => {
 
 const editColorAndImages = catchAsyncError(async (req, res, next) => {
 
+    if (!checker({ ...req.body, ...req.params }, { thumbnail: true }, 3))
+        throw new ApiError(400, "provide full info of the product")
+
+    console.log('parsing data to json ');
+    const toCreate = converter(req.body, true)
+
+    const {
+        colors, //just an array of colors
+        stocks,//array of stocks,
+    } = toCreate;
+
+    console.log('checking if colors and stocks are not empty');
+    let arrayCheck = checkArrays({ colors, stocks })
+    if (arrayCheck !== true)
+        throw new ApiError(400, `${arrayCheck} are required!!`)
+
+    console.log('finding product');
+    const product = await productModel.findById(req.params.id)
+
+    if (!product)
+        throw new ApiError(404, "product not found")
+
+    // files
+    // colors
+    // stocks
+
+    const findColor = {} //[color]:true
+    const findImage = {} //[public_id]:true
+
+    console.log('populate the findColor and findImage objects to query in O(1)');
+    // populate the findColor and findImage objects to query in O(1)
+    colors.forEach(({ color, images, mainImage }) => {
+
+        findColor[color] = true
+
+        if (mainImage)
+            findImage[mainImage.public_id] = true
+
+        images.forEach(({ public_id }) => {
+            findImage[public_id] = true
+        })
+    });
+
+
+    // {0:[{image:{url,public_id},is_main:boolean}]}
+    const [newImages, thumbnail] = await uploadAndStore(req.files ? req.files : [])
+
+    if (thumbnail) {
+        console.log('updating thumbnail');
+        product.thumbnail = thumbnail
+    }
+    console.log('new images', newImages);
+    let toBeDeletedImages = []
+
+    console.log('updating stocks');
+    // update stocks
+    product.stocks = stocks
+
+    console.log('filtering all removed colors');
+    // filter out all the removed colors and take the images to remove
+    product.colors = product.colors.filter(({ color, images }) => {
+
+        // when the color is removed then take its images to delete
+        if (!findColor[color]) {
+            toBeDeletedImages = [...toBeDeletedImages, ...images.map(
+                ({ image: { public_id } }) => public_id)]
+        }
+        return findColor[color] ? true : false
+    })
+
+    console.log('filtering all removed images');
+    // filter out all the removed images and take the removed ones to remove
+    // it can be a main image
+    product.colors = product.colors.map(({ color, images }) => (
+        {
+            color,
+            images: images.filter(({ image: { public_id } }) => {
+
+                // when image is not removed then take it
+                if (findImage[public_id])
+                    return true
+
+                // otherwise push it to delete and dont take it
+                toBeDeletedImages.push(public_id)
+
+                return false
+            })
+        }
+    ))
+
+    console.log('integrating all new images');
+    // integrate all the new images
+    product.colors = integrateImages(product.colors, newImages)
+
+    console.log(product);
+    console.log('to be deleted ', toBeDeletedImages);
+    console.log('deleting all removed images');
+    // delete all the removed images 
+    // for (const public_id of toBeDeletedImages) {
+    //     await deleteFromCloudinary(public_id)
+    // }
+
+    console.log('finally saving the updated product');
+    // finally save the updated product
+    // await product.save()
+
+    res.status(200).json({
+        success: true,
+        message: 'colors edited successfully'
+    })
+}
+)
+
+const addNewColors = catchAsyncError(async (req, res, next) => {
+
+    if (!checker({ ...req.body, ...req.params }, {}, 2))
+        throw new ApiError(400, "provide all the details")
+
+    const toAdd = converter(req.body, true)
+
+    // colors:['']
+    const { colors, stocks } = toAdd
+
+    let checkArray = checkArrays({ ...toAdd, images: req.files ? req.files : [] })
+    if (checkArray !== true)
+        throw new ApiError(400, `please provide some ${checkArray} to continue`)
+
+    const [providedImages] = await uploadAndStore(req.files)
+
+    const newColors = integrateImages(colors, providedImages)
+
+    const product = await productModel.findById(req.params.id)
+    if (!product)
+        throw new ApiError(400, "product not found")
+
+    console.log('integrating stocks and colors');
+    // integrate stocks and colors
+    product.stocks = [...product.stocks, ...stocks]
+    product.colors = [...product.colors, ...newColors]
+
+    await product.save()
+
+    res.status(200).json({
+        success: true, message: "colors added successfully"
+    })
 }
 )
 
@@ -601,11 +693,40 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
 }
 )
 
+function integrateImages(colors, images) {
+
+    // colors:[''] | [{color,images}]
+
+    // colors array will be provided by req.body
+
+    console.log('integrating images to colors');
+    // the colors array can be empty
+    let result = []
+
+    if (colors.length > 0 && typeof colors[0] === 'string') {
+        result = colors.map((color, colorIndex) => ({
+            color,
+            images: images[colorIndex]
+        }))
+    }
+    else if (colors.length > 0 && typeof colors[0] === 'object') {
+        result = colors.map(({ color, images }, colorIndex) => (
+            {
+                color,
+                // take the previous images and all the new provided images
+                images: [...images, ...(images[colorIndex] ? images[colorIndex] : [])]
+            }))
+    }
+
+    return result
+}
+
 export {
     addNewProduct,
     fetchProducts,
     editProduct,
     deleteProduct,
     fetchProductDetails,
-    editColorAndImages
+    editColorAndImages,
+    addNewColors
 }
