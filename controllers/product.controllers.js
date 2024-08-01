@@ -69,6 +69,18 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     // Match stage to filter products based on provided criteria
     const matchStage = {};
 
+    // Add a new stage to calculate the resultant price
+    pipeline.push({
+        $addFields: {
+            resultantPrice: {
+                $subtract: [
+                    "$price",
+                    { $multiply: ["$price", { $divide: ["$discount", 100] }] }
+                ]
+            }
+        }
+    });
+
     // if category is given for filtering then filter by category
     if (category) {
         // { category: 'sarees,kurti' }
@@ -88,7 +100,7 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     if (min_price) {
         const obj = { $gte: min_price }
         if (max_price) obj.$lte = max_price
-        matchStage.price = obj;
+        matchStage.resultantPrice = obj;
     }
 
     if (min_discount) {
@@ -116,8 +128,14 @@ const fetchProducts = catchAsyncError(async (req, res, next) => {
     pipeline.push({ $match: matchStage })
 
     if (sort) {
+        const sortFields = converter(sort, false, { rating: -1, price: 1 })
+
+        if (sortFields.price) {
+            sortFields.resultantPrice = sortFields.price
+            delete sortFields.price
+        }
         //{rating:-1,price:1}
-        pipeline.push({ $sort: converter(sort, false, { rating: -1, price: 1 }) });
+        pipeline.push({ $sort: sortFields });
     }
 
     pipeline.push({
@@ -267,223 +285,6 @@ const fetchProductDetails = catchAsyncError(async (req, res, next) => {
 }
 )
 
-// const editProduct = catchAsyncError(async (req, res, next) => {
-
-//     if (!checker({ ...req.body, ...req.params }, { isReturnable, discount }, 13))
-//         throw new ApiError(400, "provide necessary details to update product")
-
-//     let {
-//         product_name,
-//         price,
-//         discount,
-//         description,
-//         category,
-//         sizes,
-//         details,
-//         keyHighlights,
-//         stocks,
-//         oldColors,
-//         newColors,
-//         isReturnable,
-//         returnPolicy,
-//         totalStocks,
-//     } = req.body
-
-//     const productId = req.params.id
-
-//     sizes = JSON.parse(sizes)
-//     keyHighlights = JSON.parse(keyHighlights)
-//     oldColors = JSON.parse(oldColors)
-//     newColors = JSON.parse(newColors)
-//     stocks = JSON.parse(stocks)
-
-//     // take all the files of new colors
-//     // take all the files which are to be inserted
-//     // completely remove all images of a color if it is deleted
-//     // when new thumbnail is provided then delete old thumbnail
-//     // newMainImage[] , toBeInserted[],newThumbnail , newColors[] ,newColor[].mainImage
-
-//     let toBeDeleted = []
-//     let newThumbnail = ''
-//     const oldProduct = await productModel.findById(productId)
-
-//     // when new files are provided then upload on cloud and store 
-//     for (let i = 0; i < req.files.length; i++) {
-
-//         const { fieldname, path } = req.files[i];
-
-//         const cloudinaryResponse = await uploadOnCloudinary(path)
-
-//         const regex = /\[(\d+)\]/;
-
-//         const match = fieldname.match(regex)
-
-//         let index = ''
-
-//         console.log(match);
-
-//         if (match)
-//             index = parseInt(match[1])
-
-//         // when index not found new thumbnail is provided
-//         if (!index && fieldname.includes('newThumbnail')) {
-//             newThumbnail = {
-//                 url: cloudinaryResponse.url,
-//                 public_id: cloudinaryResponse.public_id
-//             }
-//             toBeDeleted.push(oldProduct.thumbnail.public_id)
-//         }
-//         // when new colors are available
-//         else if (fieldname.includes('newColors')) {
-//             // newColors[idnex]='red' --> {color:'red',images:[{image:{},is_main}]}
-//             const imageObj = {
-//                 image: {
-//                     url: cloudinaryResponse.url,
-//                     public_id: cloudinaryResponse.public_id
-//                 },
-//                 is_main: fieldname.includes('.mainImage')
-//             }
-
-//             if (typeof newColors[index] === 'object') {
-
-//                 // insert main image at the 0th index for T.C. O(1)
-//                 if (imageObj.is_main) {
-//                     newColors[index].images.unshift(imageObj)
-//                 }
-//                 else
-//                     newColors[index].images.push(imageObj)
-//             }
-//             else {
-//                 const tempObj = {
-//                     color: newColors[index],
-//                     images: [imageObj],
-//                 }
-
-//                 newColors[index] = tempObj
-//             }
-//         }
-//         // when old colors have changes
-//         else {
-//             // toBeInserted[] , newMainImage[]
-//             // oldColors[{color,images,mainImage,toBeDeleted,colorId}]
-
-//             let isMain = false
-
-//             // when there is a new mainImage then remove old mainImage
-//             if (fieldname.includes('newMainImage')) {
-//                 isMain = true,
-//                     toBeDeleted.push(oldColors[index].mainImage.image.public_id)
-
-//                 // by doing this we ensure that when a oldMainImage exist then it means the color hasnt any main image
-//                 oldColors[index].mainImage = null
-//             }
-
-//             let imageObj = {
-//                 image: {
-//                     url: cloudinaryResponse.url,
-//                     public_id: cloudinaryResponse.public_id
-//                 },
-//                 is_main: isMain
-//             }
-
-//             // insert main image at the 0th index for T.C. O(1)
-//             if (isMain) {
-//                 oldColors[index].images.unshift(imageObj)
-//             }
-//             else {
-//                 oldColors[index].images.push(imageObj)
-//             }
-
-//         }
-//     }
-
-//     // deleting images of removed colors
-//     for (const { _id, images } of oldProduct.colors) {
-
-//         let oldColorId = _id.toString()
-//         let check = false
-
-//         // checking if the oldColorId matches with updated colors id
-//         for (let { colorId } of oldColors) {
-//             if (colorId === oldColorId) {
-//                 check = true
-//                 break
-//             }
-//         }
-
-//         // when the color is deleted then pick its images for deletion
-//         if (!check) {
-//             let publicIds = images.map(({ image }) => image.public_id)
-//             toBeDeleted = [...toBeDeleted, ...publicIds]
-//         }
-//     }
-
-//     // add mainImages to their respective colors
-//     oldColors = oldColors.map(({ color, images, mainImage, toBeDeleted: removedImages }) => {
-
-//         // take images which have to be deleted from that color
-//         toBeDeleted = [...toBeDeleted, ...removedImages]
-
-//         // when mainImage exists it means we have to include it in images at 0 index 
-//         // when no mainImage exist then it is already set , just return
-//         return mainImage ? { color, images: [mainImage, ...images] } : { color, images }
-//     })
-
-//     // handled oldColors
-//     // handled newColors
-//     // handles mainImages
-//     // handled removed colors
-//     // handled newThumbnail
-
-//     console.log('old colors ', oldColors);
-//     console.log('new colors ', newColors);
-
-//     const newUpdatedColors = [...oldColors, ...newColors]
-
-//     console.log('new updated colors ', newUpdatedColors);
-
-//     let newProduct = {
-//         product_name,
-//         price,
-//         discount,
-//         description,
-//         category,
-//         sizes,
-//         details,
-//         keyHighlights,
-//         stocks,
-//         isReturnable,
-//         returnPolicy,
-//         totalStocks,
-//         colors: newUpdatedColors
-//     }
-
-//     console.log('new product ', newProduct);
-
-//     // when theres a new thumbnail then take it
-//     if (newThumbnail)
-//         newProduct.thumbnail = newThumbnail
-
-//     let updatedProduct = await productModel.findByIdAndUpdate(
-//         productId,
-//         // only change the given fields
-//         { $set: newProduct },
-//         { new: true }
-//     )
-
-//     // finally deleting the given images
-//     for (const public_id of toBeDeleted) {
-//         let deleteResponse = await deleteFromCloudinary(public_id)
-//         console.log('delete response ', deleteResponse);
-//     }
-
-//     res.status(200).json({
-//         success: true,
-//         message: "product updated successfully"
-//     })
-// }
-// )
-
 const editProduct = catchAsyncError(async (req, res, next) => {
 
     // price,discount,totalStocks,sizes,keyHighlights,stocks
@@ -508,20 +309,18 @@ const editColorAndImages = catchAsyncError(async (req, res, next) => {
     if (!checker({ ...req.body, ...req.params }, { thumbnail: true }, 3))
         throw new ApiError(400, "provide full info of the product")
 
-    console.log('parsing data to json ');
     const toCreate = converter(req.body, true)
 
     const {
         colors, //just an array of colors
         stocks,//array of stocks,
+        totalStocks
     } = toCreate;
 
-    console.log('checking if colors and stocks are not empty');
     let arrayCheck = checkArrays({ colors, stocks })
     if (arrayCheck !== true)
         throw new ApiError(400, `${arrayCheck} are required!!`)
 
-    console.log('finding product');
     const product = await productModel.findById(req.params.id)
 
     if (!product)
@@ -530,11 +329,10 @@ const editColorAndImages = catchAsyncError(async (req, res, next) => {
     // files
     // colors
     // stocks
-
     const findColor = {} //[color]:true
     const findImage = {} //[public_id]:true
+    let toBeDeletedImages = []
 
-    console.log('populate the findColor and findImage objects to query in O(1)');
     // populate the findColor and findImage objects to query in O(1)
     colors.forEach(({ color, images, mainImage }) => {
 
@@ -548,22 +346,6 @@ const editColorAndImages = catchAsyncError(async (req, res, next) => {
         })
     });
 
-
-    // {0:[{image:{url,public_id},is_main:boolean}]}
-    const [newImages, thumbnail] = await uploadAndStore(req.files ? req.files : [])
-
-    if (thumbnail) {
-        console.log('updating thumbnail');
-        product.thumbnail = thumbnail
-    }
-    console.log('new images', newImages);
-    let toBeDeletedImages = []
-
-    console.log('updating stocks');
-    // update stocks
-    product.stocks = stocks
-
-    console.log('filtering all removed colors');
     // filter out all the removed colors and take the images to remove
     product.colors = product.colors.filter(({ color, images }) => {
 
@@ -575,7 +357,6 @@ const editColorAndImages = catchAsyncError(async (req, res, next) => {
         return findColor[color] ? true : false
     })
 
-    console.log('filtering all removed images');
     // filter out all the removed images and take the removed ones to remove
     // it can be a main image
     product.colors = product.colors.map(({ color, images }) => (
@@ -595,21 +376,29 @@ const editColorAndImages = catchAsyncError(async (req, res, next) => {
         }
     ))
 
-    console.log('integrating all new images');
+    // {0:[{image:{url,public_id},is_main:boolean}]}
+    const [newImages, thumbnail] = await uploadAndStore(req.files ? req.files : [])
+
+    if (thumbnail) {
+        product.thumbnail = thumbnail
+    }
+
+    // update stocks
+    product.stocks = stocks
+
+    // update  totalStocks
+    product.totalStocks = totalStocks
+
     // integrate all the new images
     product.colors = integrateImages(product.colors, newImages)
 
-    console.log(product);
-    console.log('to be deleted ', toBeDeletedImages);
-    console.log('deleting all removed images');
     // delete all the removed images 
-    // for (const public_id of toBeDeletedImages) {
-    //     await deleteFromCloudinary(public_id)
-    // }
+    for (const public_id of toBeDeletedImages) {
+        await deleteFromCloudinary(public_id)
+    }
 
-    console.log('finally saving the updated product');
     // finally save the updated product
-    // await product.save()
+    await product.save()
 
     res.status(200).json({
         success: true,
@@ -620,15 +409,15 @@ const editColorAndImages = catchAsyncError(async (req, res, next) => {
 
 const addNewColors = catchAsyncError(async (req, res, next) => {
 
-    if (!checker({ ...req.body, ...req.params }, {}, 2))
+    if (!checker({ ...req.body, ...req.params }, {}, 4))
         throw new ApiError(400, "provide all the details")
 
     const toAdd = converter(req.body, true)
 
     // colors:['']
-    const { colors, stocks } = toAdd
+    const { colors, stocks, totalStocks } = toAdd
 
-    let checkArray = checkArrays({ ...toAdd, images: req.files ? req.files : [] })
+    let checkArray = checkArrays({ colors, stocks, images: req.files ? req.files : [] })
     if (checkArray !== true)
         throw new ApiError(400, `please provide some ${checkArray} to continue`)
 
@@ -640,10 +429,10 @@ const addNewColors = catchAsyncError(async (req, res, next) => {
     if (!product)
         throw new ApiError(400, "product not found")
 
-    console.log('integrating stocks and colors');
     // integrate stocks and colors
     product.stocks = [...product.stocks, ...stocks]
     product.colors = [...product.colors, ...newColors]
+    product.totalStocks += totalStocks
 
     await product.save()
 
@@ -664,10 +453,7 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
 
     // product.reviews [] of object ids
 
-    let result = await reviewModel.deleteMany({
-        // $in takes the fields id and checks if it id present in the given array then delete
-        _id: { $in: product.reviews }
-    })
+    let result = await reviewModel.deleteMany({ productId })
 
     console.log('Deletion done for reviews ', result);
 
@@ -693,11 +479,7 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
 }
 )
 
-function integrateImages(colors, images) {
-
-    // colors:[''] | [{color,images}]
-
-    // colors array will be provided by req.body
+function integrateImages(colors, newImages) {
 
     console.log('integrating images to colors');
     // the colors array can be empty
@@ -714,7 +496,7 @@ function integrateImages(colors, images) {
             {
                 color,
                 // take the previous images and all the new provided images
-                images: [...images, ...(images[colorIndex] ? images[colorIndex] : [])]
+                images: [...images, ...(newImages[colorIndex] ? newImages[colorIndex] : [])]
             }))
     }
 
