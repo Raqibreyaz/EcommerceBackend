@@ -7,7 +7,7 @@ function checker(object, excludes = {}, noOfKeys = 1) {
         for (const key of Object.keys(object)) {
 
             // the key should not be an optional key should be present with its value
-            if (!excludes[key] && !object[key])
+            if (!excludes[key] && object[key] !== false && !object[key])
                 return false
             // the key  is not an optional key and is present
             else if (!excludes[key]) {

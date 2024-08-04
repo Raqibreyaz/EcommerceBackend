@@ -6,8 +6,6 @@ export const uploadAndStore = async (files) => {
     let newImages = {}
     let thumbnail = null
 
-    console.log('taking new images uploading to cloudinary');
-
     //O(n*4) as every color has 4 images
     for (const { fieldname, path } of files ? files : []) {
 

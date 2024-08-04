@@ -13,16 +13,16 @@ export const converter = (object, toParseInJson = false, defaultValues = {}) => 
                 page: true,
                 limit: true,
                 min_discount: true,
-                min_price:true,
-                max_price:true,
-                rating:true,
-                quantity:true
+                min_price: true,
+                max_price: true,
+                rating: true,
+                quantity: true
             },
             operation: (key, value) => isNaN(value) ? (defaultValues[key] ?? 0) : parseInt(value)
         },
         booleanConvertOperation: {
             keys: { 'isReturnable': true },
-            operation: (key, value) => (value === 'true' || value === 'false') ? Boolean(value) : (defaultValues[key] ?? false)
+            operation: (key, value) => (value === 'true' || value === 'false' || value === false || value === true) ? Boolean(value) : (defaultValues[key] ?? false)
         }
     }
 
@@ -49,7 +49,7 @@ export const converter = (object, toParseInJson = false, defaultValues = {}) => 
         }
 
         // when the key is not present in any operation then directly add the key
-        if (!newObject[key])
+        if (newObject[key] !== false && !newObject[key])
             newObject[key] = value
     })
 

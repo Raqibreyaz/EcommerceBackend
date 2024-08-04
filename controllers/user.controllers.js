@@ -6,6 +6,8 @@ import { assignJwtToken } from '../utils/assignJwtToken.js'
 import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js'
 import { checker, checkArrays } from '../utils/objectAndArrayChecker.js'
 import mongoose from 'mongoose'
+import { sendEmail } from '../utils/sendEmail.js'
+import jwt from 'jsonwebtoken'
 
 const registerUser = catchAsyncError(async (req, res, next) => {
 
@@ -172,6 +174,9 @@ const addNewAddress = catchAsyncError(async (req, res, next) => {
 
     const { address } = req.body
 
+    if (!address || !checker(address, {}, 4))
+        throw new ApiError(400, "provide a valid address")
+
     const userId = req.user.id
 
     const user = await userModel.findById(userId)
@@ -224,7 +229,7 @@ const logoutUser = catchAsyncError(async (req, res, next) => {
 
     let token = `${req.user.role}Token`
 
-    res.status(200).cookie(token, '', { expires: new Date(Date.now()), httpOnly: true }).json({
+    res.status(200).cookie(token, '', { expires: new Date(Date.now()), httpOnly: true, secure: true }).json({
         success: true,
         message: "user logged out successfully"
     })
@@ -332,6 +337,65 @@ const changeUserRole = catchAsyncError(async (req, res, next) => {
 }
 )
 
+const findUserAndSendPasswordResetEmail = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.body, {}, 1))
+        throw new ApiError(400, "provide an email to send password reset email!!")
+
+    const user = await userModel.findOne({ email: req.body.email })
+
+    if (!user)
+        throw new ApiError(400, "user with this email does not exists")
+
+    // now we have to send him a link to reset the password
+    const response = await sendEmail(user.email, user.fullname)
+
+    console.log(response);
+
+    res.status(200).json({
+        success: true,
+        message: "a password reset link sent to the user's email"
+    })
+}
+)
+
+const verifyPasswordResetToken = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.body, {}, 1))
+        throw new ApiError(400, "provide a password reset token to continue password reset");
+
+    const decodedToken = jwt.verify(req.body.token, process.env.JWT_SECRET_KEY)
+
+    const { email, fullname } = decodedToken
+
+    const user = await userModel.findOne({ email, fullname })
+
+    if (!user)
+        throw new ApiError(400, "corrupt token provided")
+
+    res.status(200).json({
+        success: true,
+        message: 'user verified successfully'
+    })
+}
+)
+
+const resetPassword = catchAsyncError(async (req, res, next) => {
+
+    if (!checker(req.body, { confirmPassword: true }, 2))
+        throw new ApiError(400, "provided new password to update");
+
+    const user = await userModel.findOne({ email: req.body.email })
+    user.password = req.body.newPassword
+    await user.save()
+
+    res.status(200).json({
+        success: true,
+        message: "password updated successfully, now you can login"
+    })
+}
+)
+
 export {
     registerUser,
     loginUser,
@@ -345,5 +409,8 @@ export {
     removeAddress,
     fetchSellers,
     findUser,
-    changeUserRole
+    changeUserRole,
+    findUserAndSendPasswordResetEmail,
+    verifyPasswordResetToken,
+    resetPassword
 }

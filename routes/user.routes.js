@@ -1,5 +1,5 @@
 import express from 'express'
-import { fetchUser, loginUser, registerUser, logoutUser, editUserProfile, changeUserAvatar, addNewAddress, fetchProductOwners, fetchProfileDetails, removeAddress, fetchSellers } from '../controllers/user.controllers.js'
+import { fetchUser, loginUser, registerUser, logoutUser, editUserProfile, changeUserAvatar, addNewAddress, fetchProductOwners, fetchProfileDetails, removeAddress, fetchSellers, findUserAndSendPasswordResetEmail, verifyPasswordResetToken, resetPassword } from '../controllers/user.controllers.js'
 import { fetchDashBoard } from '../controllers/dashboard.controllers.js'
 import { verifyAdmin, verifyCustomer } from '../middlewares/verifyUser.js'
 import orderRouter from '../routes/order.routes.js'
@@ -21,6 +21,12 @@ router.route('/addnew')
 
 router.route('/login')
     .post(loginUser)
+
+router.route('/forgot-password').post(findUserAndSendPasswordResetEmail)
+
+router.route('/verify-reset-token').post(verifyPasswordResetToken)
+
+router.route('/reset-password').patch(resetPassword)
 
 router.route('/get-product-owners')
     .get(fetchProductOwners)

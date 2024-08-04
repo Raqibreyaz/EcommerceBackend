@@ -455,22 +455,15 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
 
     let result = await reviewModel.deleteMany({ productId })
 
-    console.log('Deletion done for reviews ', result);
-
     let deleteResponse = await deleteFromCloudinary(product.thumbnail.public_id)
-
-    console.log('thumbnail delete response ', deleteResponse);
 
     for (const { images } of product.colors) {
         for (const { image } of images) {
             let deleteResponse = await deleteFromCloudinary(image.public_id)
-            console.log('delete response ', deleteResponse);
         }
     }
 
     let deletedProduct = await findOneAndDelete({ _id: productId })
-
-    console.log('finally product deleted');
 
     res.status(200).json({
         success: true,
@@ -480,8 +473,6 @@ const deleteProduct = catchAsyncError(async (req, res, next) => {
 )
 
 function integrateImages(colors, newImages) {
-
-    console.log('integrating images to colors');
     // the colors array can be empty
     let result = []
 
