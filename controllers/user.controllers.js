@@ -156,7 +156,7 @@ const changeUserAvatar = catchAsyncError(async (req, res, next) => {
 
 const fetchUser = catchAsyncError(async (req, res, next) => {
     const userId = req.user.id
-    const user = await userModel.findById(userId).select("-password")
+    const user = await userModel.findById(userId).select("-password -lastPasswordResetRequest -noOfPasswordResetRequests -passwordResetTokenUsed")
 
     if (!user)
         throw new ApiError(404, "user does not exist")
@@ -347,10 +347,36 @@ const findUserAndSendPasswordResetEmail = catchAsyncError(async (req, res, next)
     if (!user)
         throw new ApiError(400, "user with this email does not exists")
 
-    // now we have to send him a link to reset the password
-    const response = await sendEmail(user.email, user.fullname)
 
-    console.log(response);
+    // now we have to check if user has not exceeded the daily limit of 3 forgots
+    const now = new Date()
+
+    // means this year , this month and this day except time
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+    const lastPasswordResetRequest = user.lastPasswordResetRequest
+    const noOfPasswordResetRequests = user.noOfPasswordResetRequests ?? 0
+
+    // when user has exceeded the limit of password resets then 
+    if (lastPasswordResetRequest &&
+        lastPasswordResetRequest >= today &&
+        noOfPasswordResetRequests >= 3)
+        throw new ApiError(400, "password reset limit exceeded!!")
+
+    // now we have to send him a link to reset the password
+    await sendEmail(user)
+
+    // update the user  token state
+    await userModel.findByIdAndUpdate(
+        user._id,
+        {
+            $set: {
+                lastPasswordResetRequest: today,
+                passwordResetTokenUsed: false,
+            },
+            $inc: { noOfPasswordResetRequests: 1 }
+        }
+    )
 
     res.status(200).json({
         success: true,
@@ -364,18 +390,24 @@ const verifyPasswordResetToken = catchAsyncError(async (req, res, next) => {
     if (!checker(req.body, {}, 1))
         throw new ApiError(400, "provide a password reset token to continue password reset");
 
+    // when token is expired then it will be handled by jwt 
     const decodedToken = jwt.verify(req.body.token, process.env.JWT_SECRET_KEY)
 
-    const { email, fullname } = decodedToken
+    const { email, userId } = decodedToken
 
-    const user = await userModel.findOne({ email, fullname })
+    const user = await userModel.findById(userId)
 
     if (!user)
         throw new ApiError(400, "corrupt token provided")
 
+    // when token is already used then 
+    if (user.passwordResetTokenUsed)
+        throw new ApiError(400, "something went wrong")
+
     res.status(200).json({
         success: true,
-        message: 'user verified successfully'
+        message: 'user verified successfully',
+        userId
     })
 }
 )
@@ -385,7 +417,10 @@ const resetPassword = catchAsyncError(async (req, res, next) => {
     if (!checker(req.body, { confirmPassword: true }, 2))
         throw new ApiError(400, "provided new password to update");
 
-    const user = await userModel.findOne({ email: req.body.email })
+    const user = await userModel.findById(req.body.userId)
+
+    user.passwordResetTokenUsed = true
+
     user.password = req.body.newPassword
     await user.save()
 

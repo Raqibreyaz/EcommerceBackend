@@ -1,21 +1,16 @@
+import dotenv from 'dotenv'
+import { connectToDatabase } from "./db/db-connection.js";
+
+dotenv.config({ path: "./.env" })
+
 import app from "./app.js";
-import { v2 as cloudinary } from 'cloudinary'
-import Razorpay from "razorpay";
 
-const port = process.env.PORT;
+const port = process.env.PORT || 4000;
 
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
+connectToDatabase().then(() => {
+    app.listen(port, () => {
+        console.log(`server is running on port ${port}`);
+    }
+    )
+})
 
-export const instance = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY,
-    key_secret: process.env.RAZORPAY_SECRET
-});
-
-app.listen(port, () => {
-    console.log(`server is running on port ${port}`);
-}
-)

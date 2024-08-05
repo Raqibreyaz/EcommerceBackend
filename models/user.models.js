@@ -78,6 +78,17 @@ const userSchema = new mongoose.Schema({
             message: "address is required"
         }
     },
+    passwordResetTokenUsed: {
+        type: Boolean,
+        default: false
+    },
+    lastPasswordResetRequest: {
+        type: Date
+    },
+    noOfPasswordResetRequests: {
+        type: Number,
+        default: 0
+    }
 }, { timestamps: true })
 
 userSchema.pre('save', async function (next) {

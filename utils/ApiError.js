@@ -10,6 +10,7 @@ const errorMiddleWare = (error, req, res, next) => {
 
     error.statusCode = error.statusCode || 500
     error.message = error.message || "internal server error"
+console.log(error);
 
     if (error.code === '11000') {
         error.message = `Duplicate Key Found ${Object.keys(error.keyValue)[0]}`

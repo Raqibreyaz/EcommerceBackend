@@ -20,7 +20,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon -r dotenv/config server.js"
   },
   "keywords": [],
   "author": "",
