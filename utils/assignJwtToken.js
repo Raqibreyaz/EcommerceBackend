@@ -11,9 +11,10 @@ export const assignJwtToken = (user, res, message) => {
 
     res.status(200)
         .cookie(tokenName, token, {
-            expires: new Date(Date.now() + process.env.COOKIE_EXPIRY * 1000 * 86400), httpOnly: true,
+            expires: new Date(Date.now() + process.env.COOKIE_EXPIRY * 1000 * 86400),
+            httpOnly: true,
             secure: true,
-            sameSite:'None'
+            sameSite: 'None'
         }
         )
         .json({

@@ -15,7 +15,7 @@ const registerUser = catchAsyncError(async (req, res, next) => {
     if (!checker({ ...req.body, avatar: req.file }, { role: true }, 6))
         throw new ApiError(400, "please provide full details")
 
-    let { fullname, email, password, phoneNo, address, role = 'customer' } = converter(req.body,true)
+    let { fullname, email, password, phoneNo, address, role = 'customer' } = converter(req.body, true)
 
     let avatar = req.file
 
@@ -228,7 +228,12 @@ const logoutUser = catchAsyncError(async (req, res, next) => {
 
     let token = `${req.user.role}Token`
 
-    res.status(200).cookie(token, '', { expires: new Date(Date.now()), httpOnly: true, secure: true }).json({
+    res.status(200).cookie(token, '', {
+        expires: new Date(Date.now()),
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None'
+    }).json({
         success: true,
         message: "user logged out successfully"
     })
