@@ -8,7 +8,7 @@ export const deleteProvidedImages = (req) => {
                 fs.unlinkSync(path);
             })
         } catch (error) {
-            
+            console.log(error);
         }
     }
 
