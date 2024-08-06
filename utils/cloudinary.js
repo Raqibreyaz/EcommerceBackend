@@ -13,18 +13,9 @@ export const uploadOnCloudinary = async (filepath) => {
 
     try {
         let uploadResponse = await cloudinary.uploader.upload(filepath)
-        fs.unlink(filepath, (err) => {
-            if (err) {
-                console.error(`Error deleting the local file: ${filepath}`, err);
-            }
-        });
+        fs.unlinkSync(filepath);
         return uploadResponse
     } catch (error) {
-        fs.unlink(filepath, (err) => {
-            if (err) {
-                console.error(`Error deleting the local file: ${filepath}`, err);
-            }
-        });
         error.message = `cloudinary upload error, ${error.message}`
         throw error
     }
@@ -34,7 +25,7 @@ export const deleteFromCloudinary = async (publicId) => {
 
     if (!publicId)
         return;
-    
+
     try {
         let deleteResponse = await cloudinary.uploader.destroy(publicId)
         return deleteResponse

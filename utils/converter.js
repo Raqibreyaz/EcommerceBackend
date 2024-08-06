@@ -2,7 +2,7 @@ export const converter = (object, toParseInJson = false, defaultValues = {}) => 
 
     const operations = {
         jsonParseOperation: {
-            keys: { 'keyHighlights': true, 'sizes': true, 'colors': true, "stocks": true, 'address': true },
+            keys: { 'keyHighlights': true, 'sizes': true, 'colors': true, "stocks": true, 'address': true, pickupAddress: true },
             operation: (key, value) => value ? JSON.parse(value) : (defaultValues[key] ?? [])
         },
         integerConvertOperation: {
@@ -16,12 +16,13 @@ export const converter = (object, toParseInJson = false, defaultValues = {}) => 
                 min_price: true,
                 max_price: true,
                 rating: true,
-                quantity: true
+                quantity: true,
+                refundAmount: true
             },
             operation: (key, value) => isNaN(value) ? (defaultValues[key] ?? 0) : parseInt(value)
         },
         booleanConvertOperation: {
-            keys: { 'isReturnable': true },
+            keys: { 'isReturnable': true, toReplace: true },
             operation: (key, value) => (value === 'true' || value === 'false' || value === false || value === true) ? Boolean(value) : (defaultValues[key] ?? false)
         }
     }

@@ -3,7 +3,7 @@ function checker(object, excludes = {}, noOfKeys = 1) {
 
     let requiredCounter = 0
 
-    if (object) {
+    if (object && typeof object=== 'object') {
         for (const key of Object.keys(object)) {
 
             // the key should not be an optional key should be present with its value

@@ -8,17 +8,16 @@ import { checker, checkArrays } from '../utils/objectAndArrayChecker.js'
 import mongoose from 'mongoose'
 import { sendEmail } from '../utils/sendEmail.js'
 import jwt from 'jsonwebtoken'
+import { converter } from '../utils/converter.js'
 
 const registerUser = catchAsyncError(async (req, res, next) => {
 
     if (!checker({ ...req.body, avatar: req.file }, { role: true }, 6))
         throw new ApiError(400, "please provide full details")
 
-    let { fullname, email, password, phoneNo, address, role = 'customer' } = req.body
+    let { fullname, email, password, phoneNo, address, role = 'customer' } = converter(req.body,true)
 
     let avatar = req.file
-
-    address = JSON.parse(address)
 
     if (!checker(address, {}, 4))
         throw new ApiError(400, "address is required!!")

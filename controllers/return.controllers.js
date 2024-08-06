@@ -6,6 +6,7 @@ import returnModel from "../models/return.models.js";
 import { checker } from "../utils/objectAndArrayChecker.js";
 import mongoose from "mongoose";
 import productModel from "../models/product.models.js";
+import { converter } from "../utils/converter.js";
 
 // takes the order id for creating return request
 const createReturnRequest = catchAsyncError(async (req, res, next) => {
@@ -27,7 +28,7 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
         reason,
         toReplace = false,
         pickupAddress
-    } = req.body
+    } = converter(req.body,true)
 
     // check for images provided
     if (req.files.length < 3 || req.files.length > 5) {
@@ -45,9 +46,6 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
         const cloudinaryResponse = await uploadOnCloudinary(path)
         images.push({ url: cloudinaryResponse.url, public_id: cloudinaryResponse.public_id })
     }
-
-    // // pickup address will be a json string parse it into json object
-    pickupAddress = JSON.parse(pickupAddress)
 
     await returnModel.create({
         productId,
