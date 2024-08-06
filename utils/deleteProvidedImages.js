@@ -3,14 +3,22 @@ import fs from 'fs'
 export const deleteProvidedImages = (req) => {
 
     const remover = (files) => {
-        try {
-            files.forEach(({ path }) => {
-                fs.unlinkSync(path);
-            })
-        } catch (error) {
-            console.log(error);
-        }
-    }
+        files.forEach(({ path }) => {
+            if (path) {
+                try {
+                    fs.unlink(path, (error) => {
+                        if (error) {
+                            console.error(`Error deleting file at path ${path}:`, error);
+                        }
+                    });
+                } catch (error) {
+                    console.log(error);
+                }
+            } else {
+                console.error('File path not found:', files);
+            }
+        });
+    };
 
     if (req.files) {
         // console.log('going to delete', req.files);
