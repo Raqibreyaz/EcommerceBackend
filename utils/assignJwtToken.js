@@ -9,8 +9,7 @@ export const assignJwtToken = (user, res, message) => {
         process.env.JWT_SECRET_KEY,
         { expiresIn: process.env.JWT_EXPIRY })
 
-    res.status(200)
-        .cookie(tokenName, token, {
+    res.status(200).cookie(tokenName, token, {
             expires: new Date(Date.now() + process.env.COOKIE_EXPIRY * 1000 * 86400),
             httpOnly: true,
             secure: true,

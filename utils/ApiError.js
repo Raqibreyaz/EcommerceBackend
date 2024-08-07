@@ -12,7 +12,6 @@ const errorMiddleWare = (error, req, res, next) => {
 
     error.statusCode = error.statusCode || 500
     error.message = error.message || "internal server error"
-    // console.log(error);
 
     // when images were provided then delete them as they are waste now
     deleteProvidedImages(req)

@@ -34,7 +34,7 @@ const addNewProduct = catchAsyncError(async (req, res, next) => {
     }
 
     // newImages:{0:[{image:{url,public_id},is_main:boolean}]}]
-    const [newImages, thumbnail] = uploadAndStore(req.files)
+    const [newImages, thumbnail] = await uploadAndStore(req.files)
 
     // newColors:[{color:'',images:[{}]}]
     const newColors = integrateImages(colors, newImages)
