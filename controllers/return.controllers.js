@@ -11,7 +11,7 @@ import { converter } from "../utils/converter.js";
 // takes the order id for creating return request
 const createReturnRequest = catchAsyncError(async (req, res, next) => {
 
-    if (!checker({ ...req.body, ...req.params }, { toReplace: true }, 7))
+    if (!checker({ ...req.body, ...req.params }, { toReplace: true, quantity: true }, 7))
         throw new ApiError(400, "provide all details to create return request")
 
     const userId = req.user.id
@@ -19,16 +19,18 @@ const createReturnRequest = catchAsyncError(async (req, res, next) => {
     const orderId = req.params.id
 
     // productId will be the unique _id in the array of products in the order  
+    const reqData = converter(req.body, true)
+ 
     let {
         productId,
         color,
         size,
-        quantity,
+        quantity = 1,
         refundAmount,
         reason,
         toReplace = false,
         pickupAddress
-    } = converter(req.body,true)
+    } = reqData
 
     // check for images provided
     if (req.files.length < 3 || req.files.length > 5) {

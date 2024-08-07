@@ -479,7 +479,7 @@ function integrateImages(colors, newImages) {
     if (colors.length > 0 && typeof colors[0] === 'string') {
         result = colors.map((color, colorIndex) => ({
             color,
-            images: images[colorIndex]
+            images: newImages[colorIndex]
         }))
     }
     else if (colors.length > 0 && typeof colors[0] === 'object') {

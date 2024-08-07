@@ -6,6 +6,8 @@ import { checker, checkArrays } from '../utils/objectAndArrayChecker.js'
 import { v4 as uuidv4 } from 'uuid'
 import crypto from 'crypto'
 import Razorpay from "razorpay";
+import { converter } from "../utils/converter.js";
+import productModel from '../models/product.models.js'
 
 const instance = new Razorpay({
     key_id: process.env.RAZORPAY_KEY,
@@ -86,27 +88,39 @@ const createOrder = catchAsyncError(async (req, res, next) => {
 
     // req.body-->products[],paymentDetails{},deliveryAddress{},totalPrice,totalAmount,totalDiscount
 
+    const clientOrder = converter(req.body, true)
+
     // checking if all the required details are provided
-    if (!checker(req.body, {}, 6))
+    if (!checker(clientOrder, {}, 6))
         throw new ApiError(400, "please provide complete details of the order")
 
     // checking if all the required payment details are provided
-    if (!checker(req.body.paymentDetails, { razorpayOrderId: true, razorpayPaymentId: true }, 2))
+    if (!checker(clientOrder.paymentDetails, { razorpayOrderId: true, razorpayPaymentId: true }, 2))
         throw new ApiError(400, "provide necessary payment details")
 
     // checking if address is provided
-    if (!checker(req.body.deliveryAddress, {}, 4))
+    if (!checker(clientOrder.deliveryAddress, {}, 4))
         throw new ApiError(400, "provide necessary payment details")
 
     // checking if there is at least one product present 
-    if (checkArrays({ products: req.body.products }) === 'products')
+    if (checkArrays({ products: clientOrder.products }) === 'products')
         throw new ApiError(400, "order should have at least one product")
 
     // products-->[{product,product_name,quantity,size,color,price,discount,image}]
 
+    // decrease quantity of each product as bought
+    // await is not used because of independent code
+    for (const { product, quantity, color, size } of clientOrder.products) {
+        await productModel.findOneAndUpdate(
+            { _id: mongoose.Types.ObjectId.createFromHexString(product), "stocks.color": color, "stocks.size": size },
+            { $inc: { "stocks.$.stock": -quantity } },
+            { new: true, runValidators: true }
+        )
+    }
+
     await orderModel.create({
         userId: req.user.id,
-        ...req.body
+        ...clientOrder
     })
 
     // clear the cart when an order is placed successfully
@@ -239,7 +253,7 @@ const cancelOrder = catchAsyncError(async (req, res, next) => {
 
     const millisecondDiff = currentDate - givenDate
 
-    const hoursDifference = millisecondDiff / 1000 * 60 * 60
+    const hoursDifference = millisecondDiff / (1000 * 60 * 60)
 
     if (hoursDifference >= 3)
         throw new ApiError(400, "cannot cancel after 3 hours")

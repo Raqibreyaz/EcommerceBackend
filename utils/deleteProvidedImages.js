@@ -12,7 +12,7 @@ export const deleteProvidedImages = (req) => {
                         }
                     });
                 } catch (error) {
-                    console.log(error);
+                    // console.log(error);
                 }
             } else {
                 console.error('File path not found:', files);
